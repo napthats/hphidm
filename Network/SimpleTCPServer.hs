@@ -5,7 +5,7 @@ module Network.SimpleTCPServer
      runTCPServer,
      getClientMessage,
      getClientMessageFrom,
-     getEachClientMessage,
+     getEachClientMessages,
      broadcastMessage,
      sendMessageTo,
     ) where
@@ -46,6 +46,13 @@ getWchan (_, wchan, _, _) = wchan
 --getStref :: Client -> IORef ClientStatus
 --getStref (_, _, _, stref) = stref
 
+isLive :: Client -> IO Bool
+isLive (_, _, _, stref) = do
+  st <- atomicModifyIORef stref (\x -> (x, x))
+  case st of 
+    Dead -> return False
+    Live -> return True
+
 
 runTCPServer :: PortNumber -> IO SimpleTCPServer
 runTCPServer port = do
@@ -54,8 +61,21 @@ runTCPServer port = do
   setSocketOption sock ReuseAddr 1
   bindSocket sock (SockAddrInet port iNADDR_ANY)
   listen sock 2
-  _ <- forkIO $ acceptLoop sock clientListRef $ newClientID
+  _ <- forkIO $ acceptLoop sock clientListRef newClientID
+  _ <- forkIO $ clientStatusCheckLoop clientListRef
   return $ SimpleTCPServer clientListRef
+
+clientStatusCheckLoop :: IORef [Client] -> IO ()
+clientStatusCheckLoop clientListRef = do
+  clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
+  putStrLn $ show $ map getClientID clientList
+  toDeleteClientList <- filterWithIOBool (liftM not . isLive) clientList
+  atomicModifyIORef clientListRef
+    (\list -> (filter
+               (\client -> notElem (getClientID client) (map getClientID toDeleteClientList))
+               list, ()))
+  threadDelay $ 1000 * 1000
+  clientStatusCheckLoop clientListRef
  
 acceptLoop :: Socket -> IORef [Client] -> ClientID -> IO ()
 acceptLoop sock clientListRef cid = do
@@ -105,10 +125,10 @@ getClientMessageFrom (SimpleTCPServer clientListRef) cid = do
                  else do
                       msg <- atomically $ readTChan wchan
                       return $ Just msg
-    Nothing -> error "Assertion error: illigal ClientID to getClientMessageFrom"
+    Nothing -> return Nothing
 
-getEachClientMessage :: SimpleTCPServer -> IO [(ClientID, String)]
-getEachClientMessage (SimpleTCPServer clientListRef) = do
+getEachClientMessages :: SimpleTCPServer -> IO [(ClientID, String)]
+getEachClientMessages (SimpleTCPServer clientListRef) = do
   clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
   notEmptyChanList <- filterWithIOBool (atomically . liftM not . isEmptyTChan . getWchan) clientList
   mapM (\(cid, wchan, _, _) -> do {msg <- atomically $ readTChan wchan; return (cid, msg)}) notEmptyChanList  
@@ -133,7 +153,6 @@ broadcastMessage :: SimpleTCPServer -> String -> IO ()
 broadcastMessage (SimpleTCPServer clientListRef) msg = do
   clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
   mapM_ (\(_, _, rchan, _) -> atomically $ writeTChan rchan msg) clientList
-
 
 sendMessageTo :: SimpleTCPServer -> ClientID -> String -> IO Bool
 sendMessageTo (SimpleTCPServer clientListRef) cid msg = do

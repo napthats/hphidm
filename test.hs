@@ -36,5 +36,7 @@ mainloop2 t = do
   m <- getEachClientMessage t
   putStrLn "----------"
   mapM_ (putStrLn . show) m
+  mapM_ (\(cid, msg) -> sendMessageTo t cid $ "yours: " ++ show msg) m
+  mapM_ (\(cid, msg) -> broadcastMessage t $ show cid ++ ": " ++ show msg) m
   threadDelay $ 1000 * 1000 * 2  
   mainloop2 t

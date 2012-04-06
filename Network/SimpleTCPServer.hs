@@ -1,4 +1,3 @@
--- don't call function with same SimpleTCPServer on multi-thread
 module Network.SimpleTCPServer
     (
      SimpleTCPServer(),
@@ -8,7 +7,7 @@ module Network.SimpleTCPServer
      getClientMessageFrom,
      getEachClientMessage,
      broadcastMessage,
---     sendMessageTo,
+     sendMessageTo,
     ) where
 
 import Network.Socket
@@ -23,73 +22,96 @@ import Control.Monad
 import Control.Monad.STM
 
     
-data SimpleTCPServer = SimpleTCPServer (IORef [(ClientID, TChan String)])
+data SimpleTCPServer = SimpleTCPServer (IORef [Client])
 newtype ClientID = ClientID Integer
                    deriving (Eq, Show)
+data ClientStatus = Live | Dead
+type Client = (ClientID, TChan String, TChan String, IORef ClientStatus)
+
+newClientID :: ClientID
+newClientID = ClientID 0
+
+nextClientID :: ClientID -> ClientID
+nextClientID (ClientID x) = ClientID $ x + 1
+
+getClientID :: Client -> ClientID
+getClientID (cid, _, _, _) = cid 
+
+getWchan :: Client -> TChan String
+getWchan (_, wchan, _, _) = wchan
+
+--getRchan :: Client -> TChan String
+--getRchan (_, _, rchan, _) = rchan
+
+--getStref :: Client -> IORef ClientStatus
+--getStref (_, _, _, stref) = stref
 
 
 runTCPServer :: PortNumber -> IO SimpleTCPServer
 runTCPServer port = do
-  chanListRef <- newIORef []
+  clientListRef <- newIORef []
   sock <- socket AF_INET Stream 0
   setSocketOption sock ReuseAddr 1
   bindSocket sock (SockAddrInet port iNADDR_ANY)
   listen sock 2
-  _ <- forkIO $ acceptLoop sock chanListRef $ newClientID
-  return $ SimpleTCPServer chanListRef
+  _ <- forkIO $ acceptLoop sock clientListRef $ newClientID
+  return $ SimpleTCPServer clientListRef
  
-acceptLoop :: Socket -> IORef [(ClientID, TChan String)] -> ClientID -> IO ()
-acceptLoop sock chanListRef cid = do
+acceptLoop :: Socket -> IORef [Client] -> ClientID -> IO ()
+acceptLoop sock clientListRef cid = do
   conn <- accept sock
-  chan <- atomically newTChan  
-  atomicModifyIORef chanListRef (\x -> ((cid, chan):x, ()))
-  _ <- forkIO $ runClient conn chan
-  acceptLoop sock chanListRef $ nextClientID cid
+  wchan <- atomically newTChan
+  rchan <- atomically newTChan
+  stref <- newIORef Live
+  atomicModifyIORef clientListRef (\x -> ((cid, wchan, rchan, stref):x, ()))
+  _ <- forkIO $ runClient conn wchan rchan stref
+  acceptLoop sock clientListRef $ nextClientID cid
 
-runClient :: (Socket, SockAddr) -> TChan String -> IO ()
-runClient (sock, _) chan = do
+runClient :: (Socket, SockAddr) -> TChan String -> TChan String -> IORef ClientStatus -> IO ()
+runClient (sock, _) wchan rchan stref = do
   hdl <- socketToHandle sock ReadWriteMode
   hSetBuffering hdl NoBuffering
---  reader <- forkIO $ fix $ \loop -> do
---    msg <- readChan chan
---    hPutStrLn hdl msg
---    loop
+  reader <- forkIO $ fix $ \loop -> do
+    msg <- atomically $ readTChan rchan
+    hPutStrLn hdl msg
+    loop
   handle (\(SomeException _) -> return ()) $ fix $ \loop -> do
     line <- hGetLine hdl
-    atomically $ writeTChan chan line
+    atomically $ writeTChan wchan line
     loop
---  killThread reader
+  killThread reader
+  atomicModifyIORef stref (\_ -> (Dead, ()))
   hClose hdl
 
 
 getClientMessage :: SimpleTCPServer -> IO (Maybe (ClientID, String))
-getClientMessage (SimpleTCPServer chanListRef) = do
-  chanList <- atomicModifyIORef chanListRef (\x -> (x, x))
-  maybeChan <- findWithIOBool (atomically . liftM not . isEmptyTChan . snd) chanList
+getClientMessage (SimpleTCPServer clientListRef) = do
+  clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
+  maybeChan <- findWithIOBool (atomically . liftM not . isEmptyTChan . getWchan) clientList
   case maybeChan of
-    Just (cid, chan) -> do 
-      msg <- atomically $ readTChan chan
+    Just (cid, wchan, _, _) -> do 
+      msg <- atomically $ readTChan wchan
       return $ Just (cid, msg)
     Nothing -> return Nothing
 
 getClientMessageFrom :: SimpleTCPServer -> ClientID -> IO (Maybe String)
-getClientMessageFrom (SimpleTCPServer chanListRef) cid = do
-  chanList <- atomicModifyIORef chanListRef (\x -> (x, x))
-  maybeChan <- return $ find ((==) cid . fst) chanList
-  case maybeChan of
-    Just (_, chan) -> do
-      isEmpty <- atomically $ isEmptyTChan chan
+getClientMessageFrom (SimpleTCPServer clientListRef) cid = do
+  clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
+  maybeClient <- return $ find ((==) cid . getClientID) clientList
+  case maybeClient of
+    Just (_, wchan, _, _) -> do
+      isEmpty <- atomically $ isEmptyTChan wchan
       if isEmpty then return Nothing
                  else do
-                      msg <- atomically $ readTChan chan
+                      msg <- atomically $ readTChan wchan
                       return $ Just msg
     Nothing -> error "Assertion error: illigal ClientID to getClientMessageFrom"
 
 getEachClientMessage :: SimpleTCPServer -> IO [(ClientID, String)]
-getEachClientMessage (SimpleTCPServer chanListRef) = do
-  chanList <- atomicModifyIORef chanListRef (\x -> (x, x))
-  notEmptyChanList <- filterWithIOBool (atomically . liftM not . isEmptyTChan . snd) chanList
-  mapM (\(cid, chan) -> do {msg <- atomically $ readTChan chan; return (cid, msg)}) notEmptyChanList  
+getEachClientMessage (SimpleTCPServer clientListRef) = do
+  clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
+  notEmptyChanList <- filterWithIOBool (atomically . liftM not . isEmptyTChan . getWchan) clientList
+  mapM (\(cid, wchan, _, _) -> do {msg <- atomically $ readTChan wchan; return (cid, msg)}) notEmptyChanList  
 
 findWithIOBool :: (a -> IO Bool) -> [a] -> IO (Maybe a)
 findWithIOBool _ [] = return Nothing
@@ -107,12 +129,18 @@ filterWithIOBool predict (x:xs) = do
                 else filterWithIOBool predict xs
 
 
-broadcastMessage :: SimpleTCPServer -> IO ()
-broadcastMessage = undefined
+broadcastMessage :: SimpleTCPServer -> String -> IO ()
+broadcastMessage (SimpleTCPServer clientListRef) msg = do
+  clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
+  mapM_ (\(_, _, rchan, _) -> atomically $ writeTChan rchan msg) clientList
 
 
-newClientID :: ClientID
-newClientID = ClientID 0
-
-nextClientID :: ClientID -> ClientID
-nextClientID (ClientID x) = ClientID $ x + 1
+sendMessageTo :: SimpleTCPServer -> ClientID -> String -> IO Bool
+sendMessageTo (SimpleTCPServer clientListRef) cid msg = do
+  clientList <- atomicModifyIORef clientListRef (\x -> (x, x))
+  maybeClient <- return $ find ((==) cid . getClientID) clientList
+  case maybeClient of
+    Just (_, _, rchan, _) -> do
+      atomically $ writeTChan rchan msg
+      return True
+    Nothing -> return False

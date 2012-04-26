@@ -48,3 +48,4 @@ makePlayerChara phi_map = PlayerChara {
   position = PM.getDefaultPosition phi_map,
   direction = PM.North,
   name = "test"}
+ 

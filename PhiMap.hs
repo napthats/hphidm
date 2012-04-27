@@ -189,6 +189,11 @@ getDefaultPosition :: PhiMap -> Position
 getDefaultPosition _ = Position {x = 0, y = 0}
 
 makePhiMap :: PhiMap
-makePhiMap = PhiMap {mapWidth = 1000, mapHeight = 1000,
-                     mapData = replicate 1000 $ replicate 1000 $ PhiMapChip {chipType = Road}}
+makePhiMap = PhiMap {mapWidth = 5, mapHeight = 5,
+                     mapData = replicate 10 $
+                               [PhiMapChip {chipType = Road},
+                                PhiMapChip {chipType = Flower},
+                                PhiMapChip {chipType = Water},
+                                PhiMapChip {chipType = Window},
+                                PhiMapChip {chipType = Wwall}]}
 

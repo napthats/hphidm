@@ -6,17 +6,18 @@ module PhiMap
          RelativeDirection(..),
          Position(),
          PhiMapChip(),
-         PhiMapView(..),
          ViewType(..),
          ViewOption(..),
          FloorItemType(..),
          SightType(..),
          getMapView,
+         getAroundPosition,
          getPhiMapChip,
          getNextPosition,
          getDefaultPosition,
          makePhiMap,
          turnAbsoluteDirection,
+         calculateRelativeDirection,
          isNormalEnterable,
         ) where
 
@@ -28,12 +29,46 @@ data Direction = AbsoluteDirection AbsoluteDirection | RelativeDirection Relativ
                deriving (Show)
 data AbsoluteDirection = North | East | West | South deriving (Show)
 data RelativeDirection = Forth | Right | Left | Back deriving (Show)
-data Position = Position {x :: Int, y :: Int} deriving (Show)
+data Position = Position {x :: Int, y :: Int} deriving (Show, Eq)
 
 isValidPosition :: PhiMap -> Position -> Bool
 isValidPosition phi_map pos =
   if (x pos >= 0 && x pos < mapWidth phi_map && y pos >= 0 && y pos < mapHeight phi_map)
      then True else False
+
+calculateRelativeDirection :: AbsoluteDirection -> AbsoluteDirection -> RelativeDirection
+calculateRelativeDirection North North = Back
+calculateRelativeDirection North East = Right
+calculateRelativeDirection North West = Left
+calculateRelativeDirection North South = Forth
+calculateRelativeDirection East North = Left
+calculateRelativeDirection East East = Back
+calculateRelativeDirection East West = Forth
+calculateRelativeDirection East South = Right
+calculateRelativeDirection West North = Right
+calculateRelativeDirection West East = Forth
+calculateRelativeDirection West West = Back
+calculateRelativeDirection West South = Left
+calculateRelativeDirection South North = Forth
+calculateRelativeDirection South East = Left
+calculateRelativeDirection South West = Right
+calculateRelativeDirection South South = Back
+
+turnAbsoluteDirection :: AbsoluteDirection -> RelativeDirection -> AbsoluteDirection
+turnAbsoluteDirection adir Forth = adir
+turnAbsoluteDirection North Right = East
+turnAbsoluteDirection North Left = West
+turnAbsoluteDirection North Back = South
+turnAbsoluteDirection East Right = South
+turnAbsoluteDirection East Left = North
+turnAbsoluteDirection East Back = West
+turnAbsoluteDirection West Right = North
+turnAbsoluteDirection West Left = South
+turnAbsoluteDirection West Back = East
+turnAbsoluteDirection South Right = West
+turnAbsoluteDirection South Left = East
+turnAbsoluteDirection South Back = North
+
 
 data PhiMap = PhiMap {mapWidth :: Int, mapHeight :: Int, mapData :: [[PhiMapChip]]} deriving (Show)
 data PhiMapChip = PhiMapChip {chipType :: ChipType} deriving (Show)
@@ -47,6 +82,11 @@ getPhiMapChip phi_map pos =
   if isValidPosition phi_map pos
   then (mapData phi_map) !! (x pos) !! (y pos)
   else outsidePhiMapChip
+
+getPositionRegion :: PhiMap -> Position -> Int -> Int -> [[Position]]
+getPositionRegion _ pos width height =
+  take height $ iterate (map (\p -> Position {x = x p, y = y p + 1})) $
+  take width $ iterate (\p -> Position {x = x p + 1, y = y p}) pos
 
 getPhiMapChipRegion :: PhiMap -> Position -> Int -> Int -> [[PhiMapChip]]
 getPhiMapChipRegion phi_map pos width height =
@@ -62,7 +102,8 @@ padDrop :: Int -> a -> [a] -> [a]
 padDrop num pad list =
   (replicate (- num) pad) ++ (drop num list)
   
-data PhiMapView = PhiMapView {viewWidth :: Int, viewHeight :: Int, viewData :: [[ViewChip]]} deriving (Show)
+
+type PhiMapView = [[ViewChip]]
 data ViewChip = ViewChip {viewType :: ViewType, viewOptions :: [ViewOption]} deriving (Show)
 data ViewType = VBars | VDoor | VDummy | VFlower | VGlass | VGrass | VMist | VMwall | VPcircle | VRoad | VRock | VTgate | VUnknown | VWater | VWindow | VWood | VWwall | VDoor_Lock | VPcircle_Lock deriving (Show)
 data ViewOption = Board | FloorItem FloorItemType deriving (Show)
@@ -70,20 +111,26 @@ data FloorItemType = Food | Weapon | Armor | Accessary | Gold | Other deriving (
 data SightType = All deriving (Show)
 
 
-getMapView :: PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> SightType -> PhiMapView
-getMapView phi_map pos adir width height All =
+getRegionWith :: (PhiMap -> Position -> Int -> Int -> [[a]]) ->
+                 PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[a]]
+getRegionWith get_region_func phi_map pos adir width height =
   let fixed_pos = case adir of
         North -> Position {x = x pos - (width - 1) `div` 2, y = y pos - 1 - (height - 1) `div` 2}
         East -> Position {x = x pos + 1 - (width - 1) `div` 2, y = y pos - (height - 1) `div` 2}
         West -> Position {x = x pos - 1 - (width - 1) `div` 2, y = y pos - (height - 1) `div` 2}
         South -> Position {x = x pos - (width - 1) `div` 2, y = y pos + 1 - (height - 1) `div` 2}
-  in let map_data = case adir of
-           North -> getPhiMapChipRegion phi_map fixed_pos width height
-           South -> map reverse $ reverse $ getPhiMapChipRegion phi_map fixed_pos width height
-           East -> reverse $ transpose $ getPhiMapChipRegion phi_map fixed_pos height width
-           West -> map reverse $ transpose $ getPhiMapChipRegion phi_map fixed_pos height width
-  in PhiMapView {viewWidth = width, viewHeight = height,
-                 viewData = map (map mapChipToViewChip) map_data}
+  in case adir of
+    North -> get_region_func phi_map fixed_pos width height
+    South -> map reverse $ reverse $ get_region_func phi_map fixed_pos width height
+    East -> reverse $ transpose $ get_region_func phi_map fixed_pos height width
+    West -> map reverse $ transpose $ get_region_func phi_map fixed_pos height width
+  
+getAroundPosition :: PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[Position]]
+getAroundPosition = getRegionWith getPositionRegion
+
+getMapView :: SightType -> PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> PhiMapView
+getMapView All phi_map pos adir width height =
+  map (map mapChipToViewChip) $ getRegionWith getPhiMapChipRegion phi_map pos adir width height
 
 mapChipToViewChip :: PhiMapChip -> ViewChip
 mapChipToViewChip map_chip =
@@ -107,14 +154,14 @@ mapChipToViewChip map_chip =
         Wwall -> VWwall
   in ViewChip {viewType = view_type, viewOptions = []}
   
-getNextPosition :: PhiMap -> Position -> AbsoluteDirection -> Maybe Position
-getNextPosition phi_map pos adir =
+getNextPosition :: PhiMap -> Position -> AbsoluteDirection -> Position
+getNextPosition _ pos adir =
   let next_pos = case adir of
         North -> Position {x = x pos, y = y pos - 1}
         East -> Position {x = x pos + 1, y = y pos}
         West -> Position {x = x pos - 1, y = y pos}
         South -> Position {x = x pos, y = y pos + 1}
-  in if isValidPosition phi_map next_pos then Just next_pos else Nothing
+  in next_pos
 
 isNormalEnterable :: PhiMapChip -> Bool
 isNormalEnterable chip = case chipType chip of
@@ -143,17 +190,3 @@ makePhiMap :: PhiMap
 makePhiMap = PhiMap {mapWidth = 1000, mapHeight = 1000,
                      mapData = replicate 1000 $ replicate 1000 $ PhiMapChip {chipType = Road}}
 
-turnAbsoluteDirection :: AbsoluteDirection -> RelativeDirection -> AbsoluteDirection
-turnAbsoluteDirection adir Forth = adir
-turnAbsoluteDirection North Right = East
-turnAbsoluteDirection North Left = West
-turnAbsoluteDirection North Back = South
-turnAbsoluteDirection East Right = South
-turnAbsoluteDirection East Left = North
-turnAbsoluteDirection East Back = West
-turnAbsoluteDirection West Right = North
-turnAbsoluteDirection West Left = South
-turnAbsoluteDirection West Back = East
-turnAbsoluteDirection South Right = West
-turnAbsoluteDirection South Left = East
-turnAbsoluteDirection South Back = North

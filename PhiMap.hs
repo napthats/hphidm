@@ -1,11 +1,13 @@
 module PhiMap
        (
          PhiMap(),
+         PhiMapView,
          Direction(..),
          AbsoluteDirection(..),
          RelativeDirection(..),
          Position(),
          PhiMapChip(),
+         ViewChip(..),
          ViewType(..),
          ViewOption(..),
          FloorItemType(..),

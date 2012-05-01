@@ -1,14 +1,15 @@
 module Chara
        (
          Chara(..),
-         PlayerChara(),
-         makePlayerChara,
+         CharaView(..),
          getAroundCharaView,
         ) where
 
 import qualified PhiMap as PM
 import Data.List (elemIndex, findIndex, find)
 
+
+data CharaView = CharaView {viewX :: Int, viewY :: Int, viewDirection :: PM.RelativeDirection, viewName :: String} deriving (Show)
 
 class Chara a where
   walk :: PM.PhiMap -> PM.Direction -> a -> Maybe a
@@ -30,32 +31,7 @@ class Chara a where
   getDirection :: a -> PM.AbsoluteDirection
   getCharaView :: PM.AbsoluteDirection -> (Int, Int, a) -> CharaView
   getName :: a -> String
-  getPhirc :: a -> Maybe String
 
-
-data PlayerChara = PlayerChara {
-  pcPosition :: PM.Position,
-  pcDirection :: PM.AbsoluteDirection,
-  pcName :: String,
-  pcPhirc :: String} deriving (Show)
-
-instance Chara PlayerChara where
-  canEnterPosition phi_map pos _ = PM.isNormalEnterable (PM.getPhiMapChip phi_map pos)
-  changePosition pos chara = PlayerChara {pcPosition = pos, pcDirection = pcDirection chara, pcName = pcName chara, pcPhirc = pcPhirc chara}
-  getPosition chara = pcPosition chara
-  getDirection chara = pcDirection chara
-  getName chara = pcName chara
-  getCharaView dir (x, y, chara) = CharaView
-    {viewX = x, viewY = y,
-     viewDirection = PM.calculateRelativeDirection dir $ getDirection chara, viewName = getName chara}
-  getPhirc chara = Just (pcPhirc chara)
-
-makePlayerChara :: PM.PhiMap -> String -> String -> PlayerChara
-makePlayerChara phi_map name phirc= PlayerChara {
-  pcPosition = PM.getDefaultPosition phi_map,
-  pcDirection = PM.North,
-  pcName = name,
-  pcPhirc = phirc}
 
 getAroundCharaView :: (Chara a) => PM.AbsoluteDirection -> [[PM.Position]] -> [a] -> [CharaView]
 getAroundCharaView dir pos_list chara_list =
@@ -75,5 +51,3 @@ getAroundCharaView dir pos_list chara_list =
                 Just xpos -> case index of
                   Nothing -> Nothing
                   Just ypos -> Just (xpos, ypos, chara)
-
-data CharaView = CharaView {viewX :: Int, viewY :: Int, viewDirection :: PM.RelativeDirection, viewName :: String} deriving (Show)

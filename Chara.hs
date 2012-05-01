@@ -11,11 +11,11 @@ import Data.List (elemIndex, findIndex, find)
 
 
 class Chara a where
-  walk :: PM.PhiMap -> PM.Direction -> a -> a
+  walk :: PM.PhiMap -> PM.Direction -> a -> Maybe a
   walk phi_map dir chara =
     let neighbor_pos = getNeighborPosition phi_map dir chara in
     if canEnterPosition phi_map neighbor_pos chara
-    then changePosition neighbor_pos chara else chara
+    then Just (changePosition neighbor_pos chara) else Nothing
   
   getNeighborPosition :: PM.PhiMap -> PM.Direction -> a -> PM.Position
   getNeighborPosition phi_map (PM.AbsoluteDirection adir) chara =

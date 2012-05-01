@@ -22,5 +22,12 @@ decodeClientMessage msg =
 
 
 stringToDirection :: String -> Maybe PM.Direction
+stringToDirection "n" = Just (PM.AbsoluteDirection PM.North)
+stringToDirection "e" = Just (PM.AbsoluteDirection PM.East)
+stringToDirection "w" = Just (PM.AbsoluteDirection PM.West)
+stringToDirection "s" = Just (PM.AbsoluteDirection PM.South)
 stringToDirection "f" = Just (PM.RelativeDirection PM.Forth)
+stringToDirection "r" = Just (PM.RelativeDirection PM.Right)
+stringToDirection "l" = Just (PM.RelativeDirection PM.Left)
+stringToDirection "b" = Just (PM.RelativeDirection PM.Back)
 stringToDirection _ = Nothing

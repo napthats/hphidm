@@ -8,10 +8,18 @@ import Data.Char (chr)
 import qualified PhiMap as PM
 
 
+{-
 makeM57MapProtocol :: PM.AbsoluteDirection -> PM.PhiMapView -> String
 makeM57MapProtocol adir map_view =
   "#m57 M " ++ adirToString adir ++ "        0:"
   ++foldl (\line_x line_y -> line_x ++ (foldl (\x y -> x ++ viewChipToString y) "" line_y)) "" map_view
+-}
+
+-- for debug in telnet
+makeM57MapProtocol :: PM.AbsoluteDirection -> PM.PhiMapView -> String
+makeM57MapProtocol adir map_view =
+  adirToString adir
+  ++foldl (\line_x line_y -> line_x ++ (foldl (\x y -> x ++ viewChipToString y) "\n" line_y)) "" map_view ++ "\n"
 
 adirToString :: PM.AbsoluteDirection -> String
 adirToString PM.North = "N"

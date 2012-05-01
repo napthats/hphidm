@@ -21,22 +21,41 @@ module PhiMap
          turnAbsoluteDirection,
          calculateRelativeDirection,
          isNormalEnterable,
+         loadPosition,
+         storePosition,
         ) where
 
 import Prelude hiding (Right, Left)
 import Data.List (transpose)
+import Data.String.Utils (split)
 
+
+data Position = Position {x :: Int, y :: Int} deriving (Show, Eq)
+
+isValidPosition :: PhiMap -> Position -> Bool
+isValidPosition phimap pos =
+  if (x pos >= 0 && x pos < mapWidth phimap && y pos >= 0 && y pos < mapHeight phimap)
+     then True else False
+
+-- return Position if format of str is "x:y" and (x, y) is valid Position
+loadPosition :: PhiMap -> String -> Maybe Position
+loadPosition phimap str = case split ":" str of
+  [x_str, y_str] -> case reads x_str of
+    [(x_num, "")] -> case reads y_str of
+      [(y_num, "")] -> let pos = Position {x = x_num, y = y_num} in
+        if isValidPosition phimap pos then Just pos else Nothing
+      _ -> Nothing
+    _ -> Nothing
+  _ -> Nothing
+
+storePosition :: PhiMap -> Position -> Maybe String
+storePosition phimap pos =
+  if isValidPosition phimap pos then Just $ show (x pos) ++ ":" ++ show (y pos) else Nothing
 
 data Direction = AbsoluteDirection AbsoluteDirection | RelativeDirection RelativeDirection
                deriving (Show)
 data AbsoluteDirection = North | East | West | South deriving (Show)
 data RelativeDirection = Forth | Right | Left | Back deriving (Show)
-data Position = Position {x :: Int, y :: Int} deriving (Show, Eq)
-
-isValidPosition :: PhiMap -> Position -> Bool
-isValidPosition phi_map pos =
-  if (x pos >= 0 && x pos < mapWidth phi_map && y pos >= 0 && y pos < mapHeight phi_map)
-     then True else False
 
 calculateRelativeDirection :: AbsoluteDirection -> AbsoluteDirection -> RelativeDirection
 calculateRelativeDirection North North = Back
@@ -80,9 +99,9 @@ outsidePhiMapChip :: PhiMapChip
 outsidePhiMapChip = PhiMapChip {chipType = Unknown}
 
 getPhiMapChip :: PhiMap -> Position -> PhiMapChip
-getPhiMapChip phi_map pos = 
-  if isValidPosition phi_map pos
-  then (mapData phi_map) !! (x pos) !! (y pos)
+getPhiMapChip phimap pos = 
+  if isValidPosition phimap pos
+  then (mapData phimap) !! (x pos) !! (y pos)
   else outsidePhiMapChip
 
 getPositionRegion :: PhiMap -> Position -> Int -> Int -> [[Position]]
@@ -91,8 +110,8 @@ getPositionRegion _ pos width height =
   take width $ iterate (\p -> Position {x = x p + 1, y = y p}) pos
 
 getPhiMapChipRegion :: PhiMap -> Position -> Int -> Int -> [[PhiMapChip]]
-getPhiMapChipRegion phi_map pos width height =
-  let map_data = mapData phi_map in
+getPhiMapChipRegion phimap pos width height =
+  let map_data = mapData phimap in
   map ((padTake width outsidePhiMapChip) . (padDrop (x pos) outsidePhiMapChip))
   (padTake height (replicate width outsidePhiMapChip) $ padDrop (y pos) (replicate width outsidePhiMapChip) map_data)
 
@@ -115,24 +134,24 @@ data SightType = All deriving (Show)
 
 getRegionWith :: (PhiMap -> Position -> Int -> Int -> [[a]]) ->
                  PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[a]]
-getRegionWith get_region_func phi_map pos adir width height =
+getRegionWith get_region_func phimap pos adir width height =
   let fixed_pos = case adir of
         North -> Position {x = x pos - (width - 1) `div` 2, y = y pos - 1 - (height - 1) `div` 2}
         East -> Position {x = x pos + 1 - (width - 1) `div` 2, y = y pos - (height - 1) `div` 2}
         West -> Position {x = x pos - 1 - (width - 1) `div` 2, y = y pos - (height - 1) `div` 2}
         South -> Position {x = x pos - (width - 1) `div` 2, y = y pos + 1 - (height - 1) `div` 2}
   in case adir of
-    North -> get_region_func phi_map fixed_pos width height
-    South -> map reverse $ reverse $ get_region_func phi_map fixed_pos width height
-    East -> reverse $ transpose $ get_region_func phi_map fixed_pos height width
-    West -> map reverse $ transpose $ get_region_func phi_map fixed_pos height width
+    North -> get_region_func phimap fixed_pos width height
+    South -> map reverse $ reverse $ get_region_func phimap fixed_pos width height
+    East -> reverse $ transpose $ get_region_func phimap fixed_pos height width
+    West -> map reverse $ transpose $ get_region_func phimap fixed_pos height width
   
 getAroundPosition :: PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[Position]]
 getAroundPosition = getRegionWith getPositionRegion
 
 getMapView :: SightType -> PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> PhiMapView
-getMapView All phi_map pos adir width height =
-  map (map mapChipToViewChip) $ getRegionWith getPhiMapChipRegion phi_map pos adir width height
+getMapView All phimap pos adir width height =
+  map (map mapChipToViewChip) $ getRegionWith getPhiMapChipRegion phimap pos adir width height
 
 mapChipToViewChip :: PhiMapChip -> ViewChip
 mapChipToViewChip map_chip =
@@ -158,12 +177,11 @@ mapChipToViewChip map_chip =
   
 getNextPosition :: PhiMap -> Position -> AbsoluteDirection -> Position
 getNextPosition _ pos adir =
-  let next_pos = case adir of
+  case adir of
         North -> Position {x = x pos, y = y pos - 1}
         East -> Position {x = x pos + 1, y = y pos}
         West -> Position {x = x pos - 1, y = y pos}
         South -> Position {x = x pos, y = y pos + 1}
-  in next_pos
 
 isNormalEnterable :: PhiMapChip -> Bool
 isNormalEnterable chip = case chipType chip of

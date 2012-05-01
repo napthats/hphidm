@@ -1,6 +1,6 @@
 module PlayerCharacter
        (
-         PlayerChara(),
+         PlayerCharacter(),
          makePlayerChara,
         ) where
 
@@ -8,17 +8,17 @@ import qualified PhiMap as PM
 import qualified Chara as C
 
 
-data PlayerChara = PlayerChara {
+data PlayerCharacter = PlayerCharacter {
   pcPosition :: PM.Position,
   pcDirection :: PM.AbsoluteDirection,
   pcName :: String} deriving (Show)
 --  pcPhirc :: String} deriving (Show)
 
 
-instance C.Chara PlayerChara where
+instance C.Chara PlayerCharacter where
   canEnterPosition phi_map pos _ = PM.isNormalEnterable (PM.getPhiMapChip phi_map pos)
 --  changePosition pos chara = PlayerChara {pcPosition = pos, pcDirection = pcDirection chara, pcName = pcName chara, pcPhirc = pcPhirc chara}
-  changePosition pos chara = PlayerChara {pcPosition = pos, pcDirection = pcDirection chara, pcName = pcName chara}
+  changePosition pos chara = PlayerCharacter {pcPosition = pos, pcDirection = pcDirection chara, pcName = pcName chara}
   getPosition chara = pcPosition chara
   getDirection chara = pcDirection chara
   getName chara = pcName chara
@@ -28,10 +28,10 @@ instance C.Chara PlayerChara where
 --  getPhirc chara = Just (pcPhirc chara)
 
 --makePlayerChara :: PM.PhiMap -> String -> String -> PlayerChara
-makePlayerChara :: PM.PhiMap -> String -> PlayerChara
+makePlayerChara :: PM.Position -> PM.AbsoluteDirection -> String -> PlayerCharacter
 --makePlayerChara phi_map name phirc= PlayerChara {
-makePlayerChara phi_map name = PlayerChara {
-  pcPosition = PM.getDefaultPosition phi_map,
-  pcDirection = PM.North,
+makePlayerChara pos dir name = PlayerCharacter {
+  pcPosition = pos,
+  pcDirection = dir,
   pcName = name}
 --  pcPhirc = phirc}

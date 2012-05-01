@@ -9,7 +9,7 @@ module ClientManager
        ) where
 
 --import Data.List (find)
-import Data.List.Utils (addToAL)
+import Data.List.Utils (addToAL, delFromAL)
 import Control.Monad (liftM)
 import qualified Network.SimpleTCPServer as NS
 import qualified Chara as PC
@@ -25,7 +25,6 @@ type Phirc = String
 makePhiWorld :: PhiWorld
 makePhiWorld = (PM.makePhiMap, ClientIDSet [], PcSet [])
 
--- null string Phirc means that Client isn't associated to any pc
 newtype ClientIDSet = ClientIDSet [(NS.ClientID, Phirc)] deriving (Show)
 newtype PcSet = PcSet [(Phirc, PC.PlayerChara)] deriving (Show)
 --reverseLookUp :: Eq b => b -> [(a, b)] -> Maybe a
@@ -57,6 +56,17 @@ resolveClientProtocolResult server result_list phiworld =
               -- ignore disconnected client
               _ <- NS.sendMessageTo server cid msg
               current_world
+            LogoutPc cid -> do
+              (phimap, ClientIDSet cidset, PcSet pcset) <- current_world
+              case lookup cid cidset of
+                -- already disconnected
+                Nothing -> current_world
+                Just phirc -> do
+                  _ <- NS.sendMessageTo server cid $ PE.encodeProtocol PE.Close
+                  _ <- NS.disconnectClient server cid
+                  let new_cidset = delFromAL cidset cid
+                  let new_pcset = delFromAL pcset phirc
+                  return (phimap, ClientIDSet new_cidset, PcSet new_pcset)
           ) (return phiworld) result_list
 
 data ClientProtocolResult = NewPc NS.ClientID Phirc PC.PlayerChara
@@ -64,6 +74,7 @@ data ClientProtocolResult = NewPc NS.ClientID Phirc PC.PlayerChara
                           | PrivateMessage NS.ClientID String
 --                          | NormalMessage PC.PlayerChara String
 --                          | BroadcastMessage PC.PlayerChara String
+                          | LogoutPc NS.ClientID
                           deriving (Show)
 
 -- returned results have to be excuted in an order of the list
@@ -71,7 +82,6 @@ executeClientProtocol :: PhiWorld -> NS.ClientID -> PD.ClientProtocol -> IO [Cli
 executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) cid protocol =
   let maybe_pc = case lookup cid cidset of 
         Nothing -> Nothing --error "ClientID is unregistered in ClientIDSet"
-        Just "" -> Nothing
         Just phirc -> case lookup phirc pcset of
           Nothing -> error "PlayerCharacter is unregistered in PcSet"
           Just pc -> Just pc
@@ -90,13 +100,13 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) cid protocol =
                            view <- makeAroundView phi_map modified_pc
                            let phirc = case lookup cid cidset of
                                  Nothing -> error "Assertion error"
-                                 Just "" -> error "Assertion error"
                                  Just x -> x
                            return [PcStatusChange phirc modified_pc, PrivateMessage cid view]
         Nothing -> return []
+      PD.Exit -> return [LogoutPc cid]
       _ -> return []
 
 makeAroundView :: PM.PhiMap -> PC.PlayerChara -> IO String
 makeAroundView phi_map pc =
-  return $ PE.makeM57MapProtocol (PC.getDirection pc) $
+  return $ PE.encodeProtocol $ PE.M57Map (PC.getDirection pc) $
     PM.getMapView PM.All phi_map (PC.getPosition pc) (PC.getDirection pc) 7 7

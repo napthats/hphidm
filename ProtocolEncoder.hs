@@ -1,11 +1,21 @@
 module ProtocolEncoder
        (
-         makeM57MapProtocol,
+         encodeProtocol,
+         ServerProtocol(..),
         ) where
 
 import Data.Char (chr)
 --import qualified Chara as PC
 import qualified PhiMap as PM
+
+
+data ServerProtocol = M57Map PM.AbsoluteDirection PM.PhiMapView
+                    | Close
+                      deriving (Show)
+
+encodeProtocol :: ServerProtocol -> String
+encodeProtocol (M57Map adir map_view) = makeM57MapProtocol adir map_view
+encodeProtocol Close = "#close"
 
 
 {-

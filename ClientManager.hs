@@ -65,8 +65,7 @@ resolveClientProtocolResult server result_list phiworld first_pcdb = do
                       -- already disconnected
                       Nothing -> ((phimap, ClientIDSet cidset, PcSet pcset), pcdb, io_list)
                       Just phirc ->
-                        let io1 = NS.sendMessageTo server cid $ PE.encodeProtocol PE.Close in
-                        let io2 = NS.disconnectClient server cid in
+                        let io = NS.disconnectClient server cid in
                         let maybe_pc = lookup phirc pcset in
                         case maybe_pc of
                           Nothing -> error "Assertion error"
@@ -75,15 +74,10 @@ resolveClientProtocolResult server result_list phiworld first_pcdb = do
                             let new_cidset = delFromAL cidset cid in
                             let new_pcset = delFromAL pcset phirc in
                             ((phimap, ClientIDSet new_cidset, PcSet new_pcset), 
-                             new_pcdb, io2:io1:io_list)
-                  ForceDisconnectByNoPc cid ->
-                    let io1 = NS.sendMessageTo server cid $ PE.encodeProtocol PE.X in
-                    let io2 = NS.disconnectClient server cid in
-                    ((phimap, ClientIDSet cidset, PcSet pcset), pcdb, io2:io1:io_list)
-                  ForceDisconnectByDupPc cid ->
-                    let io1 = NS.sendMessageTo server cid $ PE.encodeProtocol PE.X in
-                    let io2 = NS.disconnectClient server cid in
-                    ((phimap, ClientIDSet cidset, PcSet pcset), pcdb, io2:io1:io_list)
+                             new_pcdb, io:io_list)
+                  ForceDisconnect cid ->
+                    let io = NS.disconnectClient server cid in
+                    ((phimap, ClientIDSet cidset, PcSet pcset), pcdb, io:io_list)
           ) (phiworld, first_pcdb, []) result_list
   mapM_ (\x -> do _ <- x; return ()) $ reverse final_io_list
   return (final_world, final_pcdb)
@@ -94,9 +88,10 @@ data ClientProtocolResult = NewPc NS.ClientID Phirc PC.PlayerCharacter
 --                          | NormalMessage PC.PlayerChara String
 --                          | BroadcastMessage PC.PlayerChara String
                           | LogoutPc NS.ClientID
-                          | ForceDisconnectByNoPc NS.ClientID
-                          | ForceDisconnectByDupPc NS.ClientID
+                          | ForceDisconnect NS.ClientID
                           deriving (Show)
+
+
 
 -- returned results have to be excuted in an order of the list
 executeClientProtocol ::
@@ -110,9 +105,9 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
   in case maybe_pc of
     Nothing -> case protocol of
       PD.Open phirc -> case lookup phirc pcset of
-        Just _ -> [ForceDisconnectByDupPc cid]
+        Just _ -> [PrivateMessage cid $ PE.encodeProtocol PE.X, ForceDisconnect cid]
         Nothing -> case PCD.loadPc pcdb phirc of
-          Nothing -> [ForceDisconnectByNoPc cid]
+          Nothing -> [PrivateMessage cid $ PE.encodeProtocol PE.X, ForceDisconnect cid]
           Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phi_map new_pc
       _ -> []
     Just pc -> case protocol of
@@ -126,7 +121,7 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
                                  Just x -> x
                         in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
         Nothing -> []
-      PD.Exit -> [LogoutPc cid]
+      PD.Exit -> [PrivateMessage cid $ PE.encodeProtocol PE.Close, LogoutPc cid]
       _ -> []
 
 makeLookResult :: NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter -> [ClientProtocolResult]
@@ -138,3 +133,4 @@ makeAroundView :: PM.PhiMap -> PC.PlayerCharacter -> String
 makeAroundView phi_map pc =
   PE.encodeProtocol $ PE.M57Map (CH.getDirection pc) $
   PM.getMapView PM.All phi_map (CH.getPosition pc) (CH.getDirection pc) 7 7
+

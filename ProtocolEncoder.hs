@@ -92,5 +92,5 @@ makeM57ObjectProtocol otype x y adir name =
                    PM.Left -> "L"
                    PM.Back -> "B"
           in "#m57 O " ++ otype_string ++ "0000:" ++ show x ++ " " ++ show y ++ " " ++
-             dir_string ++ " " ++ replicate (31 - length name) ' ' ++ take 31 name ++
+             dir_string ++ " " ++ take 31 name ++ replicate (31 - length name) ' ' ++
              " 00                 # 00"

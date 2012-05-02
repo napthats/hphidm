@@ -10,6 +10,7 @@ import qualified PhiMap as PM
 
 
 data ServerProtocol = M57Map PM.AbsoluteDirection PM.PhiMapView
+                    | M57End
                     | Close
                     | X
                       deriving (Show)
@@ -18,6 +19,7 @@ encodeProtocol :: ServerProtocol -> String
 encodeProtocol (M57Map adir map_view) = makeM57MapProtocol adir map_view
 encodeProtocol Close = "#close"
 encodeProtocol X = "#x"
+encodeProtocol M57End = "#m57 ."
 
 
 {-

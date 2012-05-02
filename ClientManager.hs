@@ -109,8 +109,7 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
         Just _ -> [ForceDisconnectByDupPc cid]
         Nothing -> case PCD.loadPc pcdb phirc of
           Nothing -> [ForceDisconnectByNoPc cid]
-          Just new_pc -> let view = makeAroundView phi_map new_pc
-                         in [NewPc cid phirc new_pc, PrivateMessage cid view]
+          Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phi_map new_pc
       _ -> []
     Just pc -> case protocol of
       PD.Go maybe_dir -> case maybe_dir of
@@ -118,14 +117,18 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
                     in case maybe_modified_pc of
                       Nothing -> []
                       Just modified_pc ->
-                        let view = makeAroundView phi_map modified_pc
-                        in let phirc = case lookup cid cidset of
+                        let phirc = case lookup cid cidset of
                                  Nothing -> error "Assertion error"
                                  Just x -> x
-                        in [PcStatusChange phirc modified_pc, PrivateMessage cid view]
+                        in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
         Nothing -> []
       PD.Exit -> [LogoutPc cid]
       _ -> []
+
+makeLookResult :: NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter -> [ClientProtocolResult]
+makeLookResult cid phimap pc =
+  [PrivateMessage cid $ makeAroundView phimap pc,
+   PrivateMessage cid $ PE.encodeProtocol PE.M57End]
 
 makeAroundView :: PM.PhiMap -> PC.PlayerCharacter -> String
 makeAroundView phi_map pc =

@@ -13,7 +13,7 @@ module PhiMap
          FloorItemType(..),
          SightType(..),
          getMapView,
-         getAroundPosition,
+         getVisiblePositions,
          getPhiMapChip,
          getNextPosition,
          getDefaultPosition,
@@ -145,9 +145,10 @@ getRegionWith get_region_func phimap pos adir width height =
     South -> map reverse $ reverse $ get_region_func phimap fixed_pos width height
     East -> reverse $ transpose $ get_region_func phimap fixed_pos height width
     West -> map reverse $ transpose $ get_region_func phimap fixed_pos height width
-  
-getAroundPosition :: PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[Position]]
-getAroundPosition = getRegionWith getPositionRegion
+
+getVisiblePositions ::
+  SightType -> PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[Position]]
+getVisiblePositions All = getRegionWith getPositionRegion
 
 getMapView :: SightType -> PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> PhiMapView
 getMapView All phimap pos adir width height =

@@ -2,7 +2,7 @@ module Chara
        (
          Chara(..),
          CharaView(..),
-         getAroundCharaView,
+         getCharaInRegion,
         ) where
 
 import qualified PhiMap as PM
@@ -40,13 +40,11 @@ class Chara a where
   getCharaView :: PM.AbsoluteDirection -> (Int, Int, a) -> CharaView
   getName :: a -> String
 
-
-getAroundCharaView :: (Chara a) => PM.AbsoluteDirection -> [[PM.Position]] -> [a] -> [CharaView]
-getAroundCharaView dir pos_list chara_list =
+getCharaInRegion :: (Chara a) => [[PM.Position]] -> [a] -> [(Int, Int, a)]
+getCharaInRegion pos_list chara_list =
   let pos_chara_list =
         map (\chara -> getSucceedOrd (map (elemIndex (getPosition chara)) pos_list) chara) chara_list
-  in map (getCharaView dir) $ 
-     map (\x -> case x of Nothing -> undefined; Just y -> y) $
+  in map (\x -> case x of Nothing -> undefined; Just y -> y) $
      filter (\x -> case x of Nothing -> False; Just _ -> True) pos_chara_list
   where
     getSucceedOrd list chara =

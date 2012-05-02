@@ -12,6 +12,7 @@ data ClientProtocol = Open String
                     | Go PM.Direction
                     | Turn (Maybe PM.Direction)
                     | Exit
+                    | RawMessage String
                     | UnknownProtocol
 
 decodeClientMessage :: String -> ClientProtocol
@@ -28,8 +29,7 @@ decodeClientMessage msg =
                           Just d -> Go d
       ["turn"] -> Turn Nothing
       ["turn", dir] -> Turn $ stringToDirection dir
-      _ -> UnknownProtocol
-
+      _ -> RawMessage raw_message
 
 stringToDirection :: String -> Maybe PM.Direction
 stringToDirection st = case head st of

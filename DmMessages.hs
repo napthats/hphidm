@@ -12,6 +12,7 @@ data DmMessageType = GoNo
                    | NoCharacter
                    | AccessAlready
                    | ChangeClientFail
+                   | PcMessage String String
                      
 makeDmMessage :: DmMessageType -> String
 makeDmMessage GoNo = "DM > Can not go. "
@@ -21,3 +22,4 @@ makeDmMessage Seeyou = "  See you next time.  "
 makeDmMessage NoCharacter = " Your character is not here. "
 makeDmMessage AccessAlready = " You accessed already. "
 makeDmMessage ChangeClientFail = " Changing client is failed. "
+makeDmMessage (PcMessage name msg) = name ++ " > " ++ msg

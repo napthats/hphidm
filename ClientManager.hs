@@ -8,7 +8,7 @@ module ClientManager
          makePhiWorld
        ) where
 
---import Data.List (find)
+import Data.List (find)
 import Data.List.Utils (addToAL, delFromAL)
 import qualified Network.SimpleTCPServer as NS
 import qualified PlayerCharacter as PC hiding (makePlayerChara)
@@ -29,10 +29,10 @@ makePhiWorld = (PM.makePhiMap, ClientIDSet [], PcSet [])
 
 newtype ClientIDSet = ClientIDSet [(NS.ClientID, Phirc)] deriving (Show)
 newtype PcSet = PcSet [(Phirc, PC.PlayerCharacter)] deriving (Show)
---reverseLookUp :: Eq b => b -> [(a, b)] -> Maybe a
---reverseLookUp value al = case find ((== value) . snd) al of
---  Nothing -> Nothing
---  Just (a, _) -> Just a
+reverseLookUp :: Eq b => b -> [(a, b)] -> Maybe a
+reverseLookUp value al = case find ((== value) . snd) al of
+  Nothing -> Nothing
+  Just (a, _) -> Just a
 
 
 resolveClientMessages ::
@@ -57,10 +57,17 @@ resolveClientProtocolResult server result_list phiworld first_pcdb = do
                   PcStatusChange phirc pc ->
                     let new_pcset = addToAL pcset phirc pc in
                     ((phimap, ClientIDSet cidset, PcSet new_pcset), pcdb, io_list)
-                  PrivateMessage cid msg ->
+                  MessageFromDm cid msg ->
                     -- ignore disconnected client
                     let io = NS.sendMessageTo server cid msg in
                     ((phimap, ClientIDSet cidset, PcSet pcset), pcdb, io:io_list)
+                  MessageFromPc opc dpc msg ->
+                    case reverseLookUp (PC.getPhirc dpc) cidset of
+                      Nothing -> error "Assertion error: pc doesn't have client."
+                      Just dcid ->
+                        let io = NS.sendMessageTo server dcid $
+                                 DM.makeDmMessage (DM.PcMessage (CH.getName opc) msg)
+                        in ((phimap, ClientIDSet cidset, PcSet pcset), pcdb, io:io_list)
                   LogoutPc cid ->
                     case lookup cid cidset of
                       -- already disconnected
@@ -69,7 +76,7 @@ resolveClientProtocolResult server result_list phiworld first_pcdb = do
                         let io = NS.disconnectClient server cid in
                         let maybe_pc = lookup phirc pcset in
                         case maybe_pc of
-                          Nothing -> error "Assertion error"
+                          Nothing -> error "Assertion error: client don't have pc."
                           Just pc -> 
                             let new_pcdb = PCD.savePc pcdb phirc pc in
                             let new_cidset = delFromAL cidset cid in
@@ -85,7 +92,8 @@ resolveClientProtocolResult server result_list phiworld first_pcdb = do
 
 data ClientProtocolResult = NewPc NS.ClientID Phirc PC.PlayerCharacter
                           | PcStatusChange Phirc PC.PlayerCharacter
-                          | PrivateMessage NS.ClientID String
+                          | MessageFromDm NS.ClientID String
+                          | MessageFromPc PC.PlayerCharacter PC.PlayerCharacter String
 --                          | NormalMessage PC.PlayerChara String
 --                          | BroadcastMessage PC.PlayerChara String
                           | LogoutPc NS.ClientID
@@ -93,11 +101,10 @@ data ClientProtocolResult = NewPc NS.ClientID Phirc PC.PlayerCharacter
                           deriving (Show)
 
 
-
 -- returned results have to be excuted in an order of the list
 executeClientProtocol ::
   PhiWorld -> PCD.PlayerCharacterDB -> NS.ClientID -> PD.ClientProtocol -> [ClientProtocolResult]
-executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protocol =
+executeClientProtocol (phimap, ClientIDSet cidset, PcSet pcset) pcdb cid protocol =
   let maybe_pc = case lookup cid cidset of 
         Nothing -> Nothing
         Just phirc -> case lookup phirc pcset of
@@ -106,45 +113,56 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
   in case maybe_pc of
     Nothing -> case protocol of
       PD.Open phirc -> case lookup phirc pcset of
-        Just _ -> [PrivateMessage cid $ DM.makeDmMessage DM.AccessAlready,
-                   PrivateMessage cid $ DM.makeDmMessage DM.ChangeClientFail,
-                   PrivateMessage cid $ PE.encodeProtocol PE.X,
+        Just _ -> [MessageFromDm cid $ DM.makeDmMessage DM.AccessAlready,
+                   MessageFromDm cid $ DM.makeDmMessage DM.ChangeClientFail,
+                   MessageFromDm cid $ PE.encodeProtocol PE.X,
                    ForceDisconnect cid]
         Nothing -> case PCD.loadPc pcdb phirc of
-          Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.NoCharacter,
-                      PrivateMessage cid $ PE.encodeProtocol PE.X,
+          Nothing -> [MessageFromDm cid $ DM.makeDmMessage DM.NoCharacter,
+                      MessageFromDm cid $ PE.encodeProtocol PE.X,
                       ForceDisconnect cid]
-          Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phi_map new_pc
+          Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phimap new_pc
       _ -> []
     Just pc -> case protocol of
-      PD.Go dir -> let maybe_modified_pc = CH.walk phi_map dir pc in
+      PD.Go dir -> let maybe_modified_pc = CH.walk phimap dir pc in
                    case maybe_modified_pc of
-                     Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.GoNo]
+                     Nothing -> [MessageFromDm cid $ DM.makeDmMessage DM.GoNo]
                      Just modified_pc ->
                        let phirc = case lookup cid cidset of
                              Nothing -> error "Assertion error"
                              Just x -> x
-                       in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
+                       in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phimap modified_pc
       PD.Turn maybe_dir -> case maybe_dir of
         Just dir -> let modified_pc = CH.turn dir pc in
                     let phirc = case lookup cid cidset of
                           Nothing -> error "Assertion error"
                           Just x -> x
-                    in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
-        Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.TurnBad]
-      PD.Exit -> [PrivateMessage cid $ DM.makeDmMessage DM.Savedata,
-                  PrivateMessage cid $ DM.makeDmMessage DM.Seeyou,
-                  PrivateMessage cid $ PE.encodeProtocol PE.Close,
+                    in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phimap modified_pc
+        Nothing -> [MessageFromDm cid $ DM.makeDmMessage DM.TurnBad]
+      PD.RawMessage msg ->
+        let visible_pos_list = PM.getVisiblePositions PM.All phimap
+                               (CH.getPosition pc) (CH.getDirection pc) sightWidth sightHeight
+        in let visible_chara_list = CH.getCharaInRegion visible_pos_list (map snd pcset) in
+        map (\(_, _, vchara) -> MessageFromPc pc vchara msg) visible_chara_list
+      PD.Exit -> [MessageFromDm cid $ DM.makeDmMessage DM.Savedata,
+                  MessageFromDm cid $ DM.makeDmMessage DM.Seeyou,
+                  MessageFromDm cid $ PE.encodeProtocol PE.Close,
                   LogoutPc cid]
-      _ -> []
+      PD.Open _ -> []
+      PD.UnknownProtocol -> []
 
 makeLookResult :: NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter -> [ClientProtocolResult]
 makeLookResult cid phimap pc =
-  [PrivateMessage cid $ makeAroundView phimap pc,
-   PrivateMessage cid $ PE.encodeProtocol PE.M57End]
+  [MessageFromDm cid $ makeAroundView phimap pc,
+   MessageFromDm cid $ PE.encodeProtocol PE.M57End]
 
 makeAroundView :: PM.PhiMap -> PC.PlayerCharacter -> String
-makeAroundView phi_map pc =
+makeAroundView phimap pc =
   PE.encodeProtocol $ PE.M57Map (CH.getDirection pc) $
-  PM.getMapView PM.All phi_map (CH.getPosition pc) (CH.getDirection pc) 7 7
+  PM.getMapView PM.All phimap (CH.getPosition pc) (CH.getDirection pc) sightWidth sightHeight
 
+-- tentative
+sightWidth :: Int
+sightWidth = 7
+sightHeight :: Int
+sightHeight = 7

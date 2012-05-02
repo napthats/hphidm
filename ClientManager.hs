@@ -17,6 +17,7 @@ import qualified Chara as CH
 import qualified PhiMap as PM
 import qualified ProtocolDecoder as PD
 import qualified ProtocolEncoder as PE
+import qualified DmMessages as DM
 
 
 type PhiWorld = (PM.PhiMap, ClientIDSet, PcSet)
@@ -105,23 +106,31 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
   in case maybe_pc of
     Nothing -> case protocol of
       PD.Open phirc -> case lookup phirc pcset of
-        Just _ -> [PrivateMessage cid $ PE.encodeProtocol PE.X, ForceDisconnect cid]
+        Just _ -> [PrivateMessage cid $ DM.makeDmMessage DM.AccessAlready,
+                   PrivateMessage cid $ DM.makeDmMessage DM.ChangeClientFail,
+                   PrivateMessage cid $ PE.encodeProtocol PE.X,
+                   ForceDisconnect cid]
         Nothing -> case PCD.loadPc pcdb phirc of
-          Nothing -> [PrivateMessage cid $ PE.encodeProtocol PE.X, ForceDisconnect cid]
+          Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.NoCharacter,
+                      PrivateMessage cid $ PE.encodeProtocol PE.X,
+                      ForceDisconnect cid]
           Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phi_map new_pc
       _ -> []
     Just pc -> case protocol of
       PD.Go maybe_dir -> case maybe_dir of
         Just dir -> let maybe_modified_pc = CH.walk phi_map dir pc
                     in case maybe_modified_pc of
-                      Nothing -> []
+                      Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.GoNo]
                       Just modified_pc ->
                         let phirc = case lookup cid cidset of
                                  Nothing -> error "Assertion error"
                                  Just x -> x
                         in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
-        Nothing -> []
-      PD.Exit -> [PrivateMessage cid $ PE.encodeProtocol PE.Close, LogoutPc cid]
+        Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.GoNo]
+      PD.Exit -> [PrivateMessage cid $ DM.makeDmMessage DM.Savedata,
+                  PrivateMessage cid $ DM.makeDmMessage DM.Seeyou,
+                  PrivateMessage cid $ PE.encodeProtocol PE.Close,
+                  LogoutPc cid]
       _ -> []
 
 makeLookResult :: NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter -> [ClientProtocolResult]

@@ -121,7 +121,7 @@ executeClientProtocol (phimap, ClientIDSet cidset, PcSet pcset) pcdb cid protoco
           Nothing -> [MessageFromDm cid $ DM.makeDmMessage DM.NoCharacter,
                       MessageFromDm cid $ PE.encodeProtocol PE.X,
                       ForceDisconnect cid]
-          Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phimap new_pc
+          Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phimap new_pc pcset cidset
       _ -> []
     Just pc -> case protocol of
       PD.Go dir -> let maybe_modified_pc = CH.walk phimap dir pc in
@@ -131,13 +131,15 @@ executeClientProtocol (phimap, ClientIDSet cidset, PcSet pcset) pcdb cid protoco
                        let phirc = case lookup cid cidset of
                              Nothing -> error "Assertion error"
                              Just x -> x
-                       in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phimap modified_pc
+                       in [PcStatusChange phirc modified_pc] ++
+                          makeLookResult cid phimap modified_pc pcset cidset
       PD.Turn maybe_dir -> case maybe_dir of
         Just dir -> let modified_pc = CH.turn dir pc in
                     let phirc = case lookup cid cidset of
                           Nothing -> error "Assertion error"
                           Just x -> x
-                    in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phimap modified_pc
+                    in [PcStatusChange phirc modified_pc] ++
+                       makeLookResult cid phimap modified_pc pcset cidset
         Nothing -> [MessageFromDm cid $ DM.makeDmMessage DM.TurnBad]
       PD.RawMessage msg ->
         let visible_pos_list = PM.getVisiblePositions PM.All phimap
@@ -151,10 +153,29 @@ executeClientProtocol (phimap, ClientIDSet cidset, PcSet pcset) pcdb cid protoco
       PD.Open _ -> []
       PD.UnknownProtocol -> []
 
-makeLookResult :: NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter -> [ClientProtocolResult]
-makeLookResult cid phimap pc =
-  [MessageFromDm cid $ makeAroundView phimap pc,
-   MessageFromDm cid $ PE.encodeProtocol PE.M57End]
+makeLookResult :: 
+  NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter ->
+  [(Phirc, PC.PlayerCharacter)] -> [(NS.ClientID, Phirc)] -> [ClientProtocolResult]
+makeLookResult cid phimap pc pcset cidset =
+  case lookup cid cidset of
+    Nothing -> 
+      let charaset = pc : map snd pcset in
+      _makeLookResult cid phimap pc charaset
+    Just phirc -> 
+      let charaset = pc : map snd (delFromAL pcset phirc) in
+      _makeLookResult cid phimap pc charaset
+      
+_makeLookResult ::
+  (CH.Chara a) => NS.ClientID -> PM.PhiMap -> PC.PlayerCharacter -> [a] -> [ClientProtocolResult]
+_makeLookResult cid phimap pc charaset =
+  [MessageFromDm cid $ makeAroundView phimap pc] ++
+  map (MessageFromDm cid) (makeAroundCharaView phimap pc charaset) ++
+  [MessageFromDm cid $ PE.encodeProtocol PE.M57End]
+
+makeAroundCharaView :: (CH.Chara a) => PM.PhiMap -> PC.PlayerCharacter -> [a] -> [String]
+makeAroundCharaView phimap pc charaset =
+  map (\(CH.CharaView x y rdir name) -> PE.encodeProtocol $ PE.M57Obj PE.CObj x y rdir name)
+  (map (CH.getCharaView $ CH.getDirection pc) (CH.getCharaInRegion (CH.getSight phimap pc) charaset))
 
 makeAroundView :: PM.PhiMap -> PC.PlayerCharacter -> String
 makeAroundView phimap pc =

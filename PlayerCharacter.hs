@@ -25,9 +25,10 @@ instance C.Chara PlayerCharacter where
   getPosition chara = pcPosition chara
   getDirection chara = pcDirection chara
   getName chara = pcName chara
-  getCharaView dir (x, y, chara) = C.CharaView
-    {C.viewX = x, C.viewY = y,
-     C.viewDirection = PM.calculateRelativeDirection dir $ C.getDirection chara, C.viewName = C.getName chara}
+  getCharaView dir (x, y, chara) =
+    C.CharaView x y (PM.calculateRelativeDirection dir $ C.getDirection chara) (C.getName chara)
+  getSight phimap pc =
+    PM.getVisiblePositions PM.All phimap (C.getPosition pc) (C.getDirection pc) sightWidth sightHeight
 
 getPhirc :: PlayerCharacter -> String
 getPhirc pc = pcPhirc pc
@@ -41,3 +42,9 @@ makePlayerChara pos dir name phirc = PlayerCharacter {
   pcName = name,
   pcPhirc = phirc}
 --  pcPhirc = phirc}
+
+-- tentative
+sightWidth :: Int
+sightWidth = 7
+sightHeight :: Int
+sightHeight = 7

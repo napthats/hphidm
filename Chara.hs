@@ -9,7 +9,7 @@ import qualified PhiMap as PM
 import Data.List (elemIndex, findIndex, find)
 
 
-data CharaView = CharaView {viewX :: Int, viewY :: Int, viewDirection :: PM.RelativeDirection, viewName :: String} deriving (Show)
+data CharaView = CharaView Int Int PM.RelativeDirection String deriving (Show)
 
 class Chara a where
   walk :: PM.PhiMap -> PM.Direction -> a -> Maybe a
@@ -39,6 +39,7 @@ class Chara a where
   getDirection :: a -> PM.AbsoluteDirection
   getCharaView :: PM.AbsoluteDirection -> (Int, Int, a) -> CharaView
   getName :: a -> String
+  getSight :: PM.PhiMap -> a -> [[PM.Position]]
 
 getCharaInRegion :: (Chara a) => [[PM.Position]] -> [a] -> [(Int, Int, a)]
 getCharaInRegion pos_list chara_list =

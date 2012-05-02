@@ -117,16 +117,21 @@ executeClientProtocol (phi_map, ClientIDSet cidset, PcSet pcset) pcdb cid protoc
           Just new_pc -> [NewPc cid phirc new_pc] ++ makeLookResult cid phi_map new_pc
       _ -> []
     Just pc -> case protocol of
-      PD.Go maybe_dir -> case maybe_dir of
-        Just dir -> let maybe_modified_pc = CH.walk phi_map dir pc
-                    in case maybe_modified_pc of
-                      Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.GoNo]
-                      Just modified_pc ->
-                        let phirc = case lookup cid cidset of
-                                 Nothing -> error "Assertion error"
-                                 Just x -> x
-                        in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
-        Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.GoNo]
+      PD.Go dir -> let maybe_modified_pc = CH.walk phi_map dir pc in
+                   case maybe_modified_pc of
+                     Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.GoNo]
+                     Just modified_pc ->
+                       let phirc = case lookup cid cidset of
+                             Nothing -> error "Assertion error"
+                             Just x -> x
+                       in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
+      PD.Turn maybe_dir -> case maybe_dir of
+        Just dir -> let modified_pc = CH.turn dir pc in
+                    let phirc = case lookup cid cidset of
+                          Nothing -> error "Assertion error"
+                          Just x -> x
+                    in [PcStatusChange phirc modified_pc] ++ makeLookResult cid phi_map modified_pc
+        Nothing -> [PrivateMessage cid $ DM.makeDmMessage DM.TurnBad]
       PD.Exit -> [PrivateMessage cid $ DM.makeDmMessage DM.Savedata,
                   PrivateMessage cid $ DM.makeDmMessage DM.Seeyou,
                   PrivateMessage cid $ PE.encodeProtocol PE.Close,

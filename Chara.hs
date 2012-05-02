@@ -18,6 +18,13 @@ class Chara a where
     if canEnterPosition phi_map neighbor_pos chara
     then Just (changePosition neighbor_pos chara) else Nothing
   
+  turn :: PM.Direction -> a -> a
+  turn dir chara =
+    let next_dir = case dir of
+          PM.AbsoluteDirection adir -> adir
+          PM.RelativeDirection rdir -> PM.turnAbsoluteDirection (getDirection chara) rdir
+    in changeDirection next_dir chara
+
   getNeighborPosition :: PM.PhiMap -> PM.Direction -> a -> PM.Position
   getNeighborPosition phi_map (PM.AbsoluteDirection adir) chara =
     PM.getNextPosition phi_map (getPosition chara) adir
@@ -27,6 +34,7 @@ class Chara a where
   
   canEnterPosition :: PM.PhiMap -> PM.Position -> a -> Bool
   changePosition :: PM.Position -> a -> a
+  changeDirection :: PM.AbsoluteDirection -> a -> a
   getPosition :: a -> PM.Position
   getDirection :: a -> PM.AbsoluteDirection
   getCharaView :: PM.AbsoluteDirection -> (Int, Int, a) -> CharaView

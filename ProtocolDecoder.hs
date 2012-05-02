@@ -9,7 +9,8 @@ import qualified PhiMap as PM
 
 
 data ClientProtocol = Open String
-                    | Go (Maybe PM.Direction)
+                    | Go PM.Direction
+                    | Turn (Maybe PM.Direction)
                     | Exit
                     | UnknownProtocol
 
@@ -21,8 +22,12 @@ decodeClientMessage msg =
       _ -> UnknownProtocol
     raw_message -> case split " " raw_message of
       ["exit"] -> Exit
-      ["go"] -> Go Nothing
-      ["go", dir] -> Go (stringToDirection dir)
+      ["go"] -> Go $ PM.RelativeDirection PM.Forth
+      ["go", dir] -> case stringToDirection dir of
+                          Nothing -> Go $ PM.RelativeDirection PM.Forth
+                          Just d -> Go d
+      ["turn"] -> Turn Nothing
+      ["turn", dir] -> Turn $ stringToDirection dir
       _ -> UnknownProtocol
 
 

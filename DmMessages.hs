@@ -6,6 +6,7 @@ module DmMessages
 
 
 data DmMessageType = GoNo
+                   | TurnBad
                    | Savedata
                    | Seeyou
                    | NoCharacter
@@ -14,6 +15,7 @@ data DmMessageType = GoNo
                      
 makeDmMessage :: DmMessageType -> String
 makeDmMessage GoNo = "DM > Can not go. "
+makeDmMessage TurnBad = "DM > Which direction? Type 'turn ????'. "
 makeDmMessage Savedata = "  Saving data..  "
 makeDmMessage Seeyou = "  See you next time.  "
 makeDmMessage NoCharacter = " Your character is not here. "

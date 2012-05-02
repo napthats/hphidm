@@ -101,7 +101,7 @@ outsidePhiMapChip = PhiMapChip {chipType = Unknown}
 getPhiMapChip :: PhiMap -> Position -> PhiMapChip
 getPhiMapChip phimap pos = 
   if isValidPosition phimap pos
-  then (mapData phimap) !! (x pos) !! (y pos)
+  then (mapData phimap) !! (y pos) !! (x pos)
   else outsidePhiMapChip
 
 getPositionRegion :: PhiMap -> Position -> Int -> Int -> [[Position]]
@@ -208,7 +208,7 @@ getDefaultPosition _ = Position {x = 0, y = 0}
 
 makePhiMap :: PhiMap
 makePhiMap = PhiMap {mapWidth = 5, mapHeight = 5,
-                     mapData = replicate 10 $
+                     mapData = replicate 5 $
                                [PhiMapChip {chipType = Road},
                                 PhiMapChip {chipType = Flower},
                                 PhiMapChip {chipType = Water},

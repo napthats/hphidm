@@ -32,6 +32,9 @@ class Chara a where
     let adir = getDirection chara in
     PM.getNextPosition phi_map (getPosition chara) (PM.turnAbsoluteDirection adir rdir)
   
+  canSee :: PM.PhiMap -> PM.Position -> a -> Bool
+  canSee phimap pos chara = any (== pos) $ concat $ getSight phimap chara
+  
   canEnterPosition :: PM.PhiMap -> PM.Position -> a -> Bool
   changePosition :: PM.Position -> a -> a
   changeDirection :: PM.AbsoluteDirection -> a -> a

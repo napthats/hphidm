@@ -52,10 +52,10 @@ executeClientProtocol world pcdb cid protocol =
                    case maybe_modified_pc of
                      Nothing -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.GoNo]
                      Just modified_pc ->
-                       [PW.PcStatusChange PW.SCPosition modified_pc]
+                       [PW.PcStatusChange PW.PSCPosition modified_pc]
       PD.Turn maybe_dir -> case maybe_dir of
         Just dir -> let modified_pc = CH.turn dir pc in
-                    [PW.PcStatusChange PW.SCDirection modified_pc]
+                    [PW.PcStatusChange PW.PSCDirection modified_pc]
         Nothing -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.TurnBad]
       PD.RawMessage msg ->
         let visible_pos_list = PM.getVisiblePositions PM.All phimap

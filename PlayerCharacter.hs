@@ -1,7 +1,7 @@
 module PlayerCharacter
        (
          PlayerCharacter(),
-         makePlayerChara,
+         makePlayerCharacter,
          getPhirc,
         ) where
 
@@ -14,12 +14,9 @@ data PlayerCharacter = PlayerCharacter {
   pcDirection :: PM.AbsoluteDirection,
   pcName :: String,
   pcPhirc :: String} deriving (Show)
---  pcPhirc :: String} deriving (Show)
-
 
 instance C.Chara PlayerCharacter where
   canEnterPosition phi_map pos _ = PM.isNormalEnterable (PM.getPhiMapChip phi_map pos)
---  changePosition pos chara = PlayerChara {pcPosition = pos, pcDirection = pcDirection chara, pcName = pcName chara, pcPhirc = pcPhirc chara}
   changePosition pos chara = PlayerCharacter {pcPosition = pos, pcDirection = pcDirection chara, pcName = pcName chara, pcPhirc = pcPhirc chara}
   changeDirection dir chara = PlayerCharacter {pcPosition = pcPosition chara, pcDirection = dir, pcName = pcName chara, pcPhirc = pcPhirc chara}
   getPosition chara = pcPosition chara
@@ -33,15 +30,12 @@ instance C.Chara PlayerCharacter where
 getPhirc :: PlayerCharacter -> String
 getPhirc pc = pcPhirc pc
 
---makePlayerChara :: PM.PhiMap -> String -> String -> PlayerChara
-makePlayerChara :: PM.Position -> PM.AbsoluteDirection -> String -> String-> PlayerCharacter
---makePlayerChara phi_map name phirc= PlayerChara {
-makePlayerChara pos dir name phirc = PlayerCharacter {
+makePlayerCharacter :: PM.Position -> PM.AbsoluteDirection -> String -> String-> PlayerCharacter
+makePlayerCharacter pos dir name phirc = PlayerCharacter {
   pcPosition = pos,
   pcDirection = dir,
   pcName = name,
   pcPhirc = phirc}
---  pcPhirc = phirc}
 
 -- tentative
 sightWidth :: Int

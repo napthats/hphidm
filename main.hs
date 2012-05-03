@@ -10,7 +10,7 @@ main :: IO ()
 main = do
   server <- NS.runTCPServer 20017
   let world = PW.makePhiWorld
-  let phimap = case world of (x,_,_) -> x
+  let phimap = PW.getPhiMap world
   pcdb <- PCD.makePcDB phimap
   cur <- getClockTime
   mainLoop server world pcdb cur

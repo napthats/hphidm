@@ -23,7 +23,7 @@ newtype PlayerCharacterDB = PcDB [(Phirc, PcData)] deriving (Show)
 loadPc :: PlayerCharacterDB -> Phirc -> Maybe PC.PlayerCharacter
 loadPc (PcDB pcdb) phirc = case lookup phirc pcdb of
   Nothing -> Nothing
-  Just (pos, dir, name) -> Just $ PC.makePlayerChara pos dir name phirc
+  Just (pos, dir, name) -> Just $ PC.makePlayerCharacter pos dir name phirc
 
 savePc :: PlayerCharacterDB -> Phirc -> PC.PlayerCharacter -> PlayerCharacterDB
 savePc (PcDB pcdb) phirc pc =

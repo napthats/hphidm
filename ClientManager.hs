@@ -5,7 +5,7 @@ module ClientManager
 
 import Data.List.Utils (delFromAL)
 import qualified Network.SimpleTCPServer as NS
-import qualified PlayerCharacter as PC hiding (makePlayerChara)
+import qualified PlayerCharacter as PC hiding (makePlayerCharacter)
 import qualified PlayerCharacterDB as PCD
 import qualified Chara as CH
 import qualified PhiMap as PM
@@ -25,7 +25,11 @@ resolveClientMessages server phiworld pcdb = do
 -- returned results have to be excuted in an order of the list
 executeClientProtocol ::
   PW.PhiWorld -> PCD.PlayerCharacterDB -> NS.ClientID -> PD.ClientProtocol -> [PW.ActionResult]
-executeClientProtocol (phimap, PW.ClientIDSet cidset, PW.PcSet pcset) pcdb cid protocol =
+--executeClientProtocol (phimap, PW.ClientIDSet cidset, PW.PcSet pcset) pcdb cid protocol =
+executeClientProtocol world pcdb cid protocol =
+  let phimap = PW.getPhiMap world in
+  let cidset = PW.getClientIDSet world in
+  let pcset = PW.getPcSet world in
   let maybe_pc = case lookup cid cidset of 
         Nothing -> Nothing
         Just phirc -> case lookup phirc pcset of

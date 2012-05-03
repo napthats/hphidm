@@ -14,6 +14,7 @@ data ClientProtocol = Open String
                     | Exit
                     | RawMessage String
                     | UnknownProtocol
+                    deriving (Show)
 
 decodeClientMessage :: String -> ClientProtocol
 decodeClientMessage msg =
@@ -32,13 +33,13 @@ decodeClientMessage msg =
       _ -> RawMessage raw_message
 
 stringToDirection :: String -> Maybe PM.Direction
-stringToDirection st = case head st of
-  'n' -> Just (PM.AbsoluteDirection PM.North)
-  'e' -> Just (PM.AbsoluteDirection PM.East)
-  'w' -> Just (PM.AbsoluteDirection PM.West)
-  's' -> Just (PM.AbsoluteDirection PM.South)
-  'f' -> Just (PM.RelativeDirection PM.Forth)
-  'r' -> Just (PM.RelativeDirection PM.Right)
-  'l' -> Just (PM.RelativeDirection PM.Left)
-  'b' -> Just (PM.RelativeDirection PM.Back)
+stringToDirection st = case st of
+  'n':_ -> Just (PM.AbsoluteDirection PM.North)
+  'e':_ -> Just (PM.AbsoluteDirection PM.East)
+  'w':_ -> Just (PM.AbsoluteDirection PM.West)
+  's':_ -> Just (PM.AbsoluteDirection PM.South)
+  'f':_ -> Just (PM.RelativeDirection PM.Forth)
+  'r':_ -> Just (PM.RelativeDirection PM.Right)
+  'l':_ -> Just (PM.RelativeDirection PM.Left)
+  'b':_ -> Just (PM.RelativeDirection PM.Back)
   _ -> Nothing

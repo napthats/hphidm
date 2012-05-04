@@ -69,12 +69,12 @@ getNpcId npc = npcId npc
 -- add livetime (milliseconds)
 -- return new npc and whether npc ready to act or not
 addLiveTime :: Int -> NonPlayerCharacter -> (NonPlayerCharacter, Bool)
-addLiveTime x npc =
+addLiveTime dtime npc =
   let speed = npcMillisecondsPerAction npc in
   let livetime = npcLivetime npc in
-  let new_livetime = max 0 (livetime + x) in -- livetime turns to 0 if overflow occurs
+  let new_livetime = max 0 (livetime + dtime) in -- livetime turns to 0 if overflow occurs
   let new_npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = new_livetime, npcId = npcId npc} in
-  if (livetime `mod` speed) + x >= speed then (new_npc, True) else (new_npc, False)
+  if (livetime `mod` speed) + dtime >= speed then (new_npc, True) else (new_npc, False)
 
 -- tentative
 sightWidth :: Int

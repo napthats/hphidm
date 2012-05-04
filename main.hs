@@ -1,9 +1,11 @@
 import System.Time (getClockTime, ClockTime)
+import System.Random (RandomGen, getStdGen)
 import qualified Utils.MyDelay as UM
 import qualified ClientManager as CM
 import qualified Network.SimpleTCPServer as NS
 import qualified PlayerCharacterDB as PCD
 import qualified PhiWorld as PW
+import qualified NonPlayerCharacterManager as NPCM
 
 
 main :: IO ()
@@ -13,12 +15,20 @@ main = do
   let phimap = PW.getPhiMap world
   pcdb <- PCD.makePcDB phimap
   cur <- getClockTime
-  mainLoop server world pcdb cur
+  gen <- getStdGen
+  mainLoop server world pcdb cur gen
 
-mainLoop :: NS.SimpleTCPServer -> PW.PhiWorld -> PCD.PlayerCharacterDB -> ClockTime -> IO ()
-mainLoop server world pcdb pre = do
+mainLoop ::
+  RandomGen g => NS.SimpleTCPServer -> PW.PhiWorld -> PCD.PlayerCharacterDB -> ClockTime -> g -> IO ()
+mainLoop server world pcdb pre gen = do
   pc_action_result_list <- CM.resolveClientMessages server world pcdb
-  (new_world, new_pcdb) <- PW.resolveActionResult server pc_action_result_list world pcdb
+  let (npc_action_result_list, next_gen) = NPCM.resolveNpcActions world millisecondsPerFrame gen 
+  (new_world, new_pcdb) <-
+    PW.resolveActionResult server (pc_action_result_list ++ npc_action_result_list) world pcdb
   cur <- getClockTime
-  UM.delayForFramerate 100 cur pre
-  mainLoop server new_world new_pcdb cur
+  UM.delayForFramerate millisecondsPerFrame cur pre
+  next_cur <- getClockTime
+  mainLoop server new_world new_pcdb next_cur next_gen
+
+millisecondsPerFrame :: Int
+millisecondsPerFrame = 100

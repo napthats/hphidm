@@ -34,12 +34,12 @@ deletePcData (PcDB pcdb) phirc = PcDB $ delFromAL pcdb phirc
 
 -- test data
 makePcDB :: PM.PhiMap -> IO PlayerCharacterDB
-makePcDB phimap = return $ PcDB [("1", (case PM.loadPosition phimap "0:1" of
+makePcDB phimap = return $ PcDB [("guest1", (case PM.loadPosition phimap "0:1" of
                                            Nothing -> undefined
                                            Just pos -> pos,
                                         PM.East,
                                         "test1")),
-                                 ("2", (case PM.loadPosition phimap "2:2" of
+                                 ("guest2", (case PM.loadPosition phimap "2:2" of
                                            Nothing -> undefined
                                            Just pos -> pos,
                                         PM.South,

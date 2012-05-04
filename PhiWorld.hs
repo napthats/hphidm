@@ -77,7 +77,8 @@ makePhiWorld =
   let nid = NPC.newNpcId in
   PhiWorld (phimap, [], [],
             (nid,
-             [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc" 1 nid)]))
+             [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid),
+              (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 5000 (NPC.nextNpcId nid))]))
 
 
 
@@ -133,14 +134,14 @@ _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, e
           let new_io_list =
                 reverse $
                 sendLookMessagesToCanSeePosPc server phimap pos cidset pcset
-                (map snd pcset) (map snd (snd npcset)) in
+                (map snd pcset) (map snd (snd new_npcset)) in
           (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
                      new_io_list ++ io_list, event_list, server)
         NPSCPosition ->
           let new_io_list =
                 reverse $
                 sendLookMessagesToCanSeePosPc server phimap pos cidset pcset
-                (map snd pcset) (map snd (snd npcset)) in
+                (map snd pcset) (map snd (snd new_npcset)) in
           (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
                      new_io_list ++ io_list, event_list, server)
         NPSCLivetime ->

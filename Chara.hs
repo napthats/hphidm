@@ -2,12 +2,14 @@ module Chara
        (
          Chara(..),
          CharaView(..),
+         InjuredBy(..),
          getCharaInRegion,
         ) where
 
 import Data.List (elemIndex, findIndex, find)
 import qualified PhiMap as PM
 import qualified Combat as CO
+import CharaData
 
 
 data CharaView = CharaView Int Int PM.RelativeDirection String deriving (Show)
@@ -36,16 +38,23 @@ class Chara a where
   canSee :: PM.PhiMap -> PM.Position -> a -> Bool
   canSee phimap pos chara = any (== pos) $ concat $ getSight phimap chara
   
-  canEnterPosition :: PM.PhiMap -> PM.Position -> a -> Bool
   changePosition :: PM.Position -> a -> a
   changeDirection :: PM.AbsoluteDirection -> a -> a
+  addHp :: Int -> InjuredBy -> a -> a
+  canEnterPosition :: PM.PhiMap -> PM.Position -> a -> Bool
   getPosition :: a -> PM.Position
   getDirection :: a -> PM.AbsoluteDirection
   getCharaView :: PM.AbsoluteDirection -> (Int, Int, a) -> CharaView
   getName :: a -> String
+  getMhp :: a -> Int
+  getHp :: a -> Int
+  getMmp :: a -> Int
+  getMp :: a -> Int
+  isDead :: a -> Bool
   getSight :: PM.PhiMap -> a -> [[PM.Position]]
   hitTo :: Chara b => a -> b -> (a, b, CO.CombatResult)
   getHitRange :: PM.PhiMap -> a -> [PM.Position]
+  getLastInjured :: a -> Maybe InjuredBy
 
 getCharaInRegion :: (Chara a) => [[PM.Position]] -> [a] -> [(Int, Int, a)]
 getCharaInRegion pos_list chara_list =

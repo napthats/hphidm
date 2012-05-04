@@ -12,16 +12,10 @@ module NonPlayerCharacter
        ) where
 
 import qualified PhiMap as PM
-import qualified Chara as C
+import qualified Chara as CH
+import CharaData
 
 
-newtype NpcId = NpcId Integer deriving (Eq, Show)
-
-newNpcId :: NpcId
-newNpcId = NpcId 0
-
-nextNpcId :: NpcId -> NpcId
-nextNpcId (NpcId x) = NpcId $ x + 1
 
 
 data NpcAction = RandomMove deriving (Show)
@@ -30,38 +24,43 @@ chooseAction :: NonPlayerCharacter -> NpcAction
 chooseAction _ = RandomMove
 
 
-data NonPlayerCharacter = NonPlayerCharacter {
-  npcPosition :: PM.Position,
-  npcDirection :: PM.AbsoluteDirection,
-  npcName :: String,
-  npcMillisecondsPerAction :: Int,
-  npcLivetime :: Int,
-  npcId :: NpcId} deriving (Show)
-
-instance C.Chara NonPlayerCharacter where
+instance CH.Chara NonPlayerCharacter where
+  changePosition pos npc = NonPlayerCharacter {npcPosition = pos, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = npcLivetime npc, npcId = npcId npc, npcMhp = npcMhp npc, npcHp = npcHp npc, npcMmp = npcMmp npc, npcMp = npcMp npc, npcInjuredBy = npcInjuredBy npc}
+  changeDirection dir npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = dir, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = npcLivetime npc, npcId = npcId npc, npcMhp = npcMhp npc, npcHp = npcHp npc, npcMmp = npcMmp npc, npcMp = npcMp npc, npcInjuredBy = npcInjuredBy npc}
+  addHp dhp injured_by npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = npcLivetime npc, npcId = npcId npc, npcMhp = npcMhp npc, npcHp = min (npcMhp npc) (npcHp npc + dhp), npcMmp = npcMmp npc, npcMp = npcMp npc, npcInjuredBy = Just injured_by}
   canEnterPosition phi_map pos _ = PM.isNormalEnterable (PM.getPhiMapChip phi_map pos)
-  changePosition pos npc = NonPlayerCharacter {npcPosition = pos, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = npcLivetime npc, npcId = npcId npc}
-  changeDirection dir npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = dir, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = npcLivetime npc, npcId = npcId npc}
   getPosition npc = npcPosition npc
   getDirection npc = npcDirection npc
   getName npc = npcName npc
+  getMhp npc = npcMhp npc
+  getHp npc = npcHp npc
+  getMmp npc = npcMmp npc
+  getMp npc = npcMp npc
+  isDead npc = CH.getHp npc <= 0 || CH.getMp npc <= 0
   getCharaView dir (x, y, npc) =
-    C.CharaView x y (PM.calculateRelativeDirection dir $ C.getDirection npc) (C.getName npc)
+    CH.CharaView x y (PM.calculateRelativeDirection dir $ CH.getDirection npc) (CH.getName npc)
   getSight phimap npc =
-   PM.getVisiblePositions PM.All phimap (C.getPosition npc) (C.getDirection npc) sightWidth sightHeight
+    PM.getVisiblePositions PM.All phimap (CH.getPosition npc) (CH.getDirection npc)
+    sightWidth sightHeight
   hitTo = undefined
   getHitRange = undefined
+  getLastInjured npc = npcInjuredBy npc
 
 makeNonPlayerCharacter ::
-  PM.Position -> PM.AbsoluteDirection -> String -> Int -> NpcId -> NonPlayerCharacter
-makeNonPlayerCharacter pos dir name speed nid =
+  PM.Position -> PM.AbsoluteDirection -> String -> Int -> NpcId -> Int -> Int -> Int -> Int -> NonPlayerCharacter
+makeNonPlayerCharacter pos dir name speed nid mhp hp mmp mp =
   NonPlayerCharacter {
     npcPosition = pos,
     npcDirection = dir,
     npcName = name,
     npcMillisecondsPerAction = speed,
     npcLivetime = 0,
-    npcId = nid
+    npcId = nid,
+    npcMhp = mhp,
+    npcHp = min mhp hp,
+    npcMmp = mmp,
+    npcMp = min mmp mp,
+    npcInjuredBy = Nothing
   }
 
 getNpcId :: NonPlayerCharacter -> NpcId
@@ -75,7 +74,7 @@ addLiveTime dtime npc =
   let speed = npcMillisecondsPerAction npc in
   let livetime = npcLivetime npc in
   let new_livetime = max 0 (livetime + dtime) in -- livetime turns to 0 if overflow occurs
-  let new_npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = new_livetime, npcId = npcId npc} in
+  let new_npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = new_livetime, npcId = npcId npc, npcMhp = npcMhp npc, npcHp = npcHp npc, npcMmp = npcMmp npc, npcMp = npcMp npc, npcInjuredBy = npcInjuredBy npc} in
   if (livetime `mod` speed) + dtime >= speed then (new_npc, True) else (new_npc, False)
 
 -- tentative

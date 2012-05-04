@@ -76,20 +76,30 @@ makePhiWorld :: PhiWorld
 makePhiWorld = 
   let phimap = PM.makePhiMap in
   let nid = NPC.newNpcId in
-  PhiWorld (phimap, [], [],
-            (nid,
-             [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid),
-              (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 5000 (NPC.nextNpcId nid))]))
+  PhiWorld (phimap, [], [], (nid, [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000), (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 100000 (NPC.nextNpcId nid) 2000 101 2000 100)]))
 
 
 resolveActionResult ::
   NS.SimpleTCPServer -> [ActionResult] -> PhiWorld -> PCD.PlayerCharacterDB ->
   IO (PhiWorld, PCD.PlayerCharacterDB)
-resolveActionResult server result_list phiworld first_pcdb = do
-  let (next_world, next_pcdb, io_list, _, _) =
-        foldl _resolveActionResult (phiworld, first_pcdb, [], [], server) result_list
-  mapM_ (\x -> do _ <- x; return ()) $ reverse io_list
-  return (next_world, next_pcdb)
+resolveActionResult server result_list phiworld pcdb = do
+  let (next_world, next_pcdb, io_list_self, _, _) =
+        foldl _resolveActionResult (phiworld, pcdb, [], [], server) $
+        filter (\result -> case result of
+                                PcStatusChange _ _ -> True 
+                                NpcStatusChange _ _ -> True
+                                _ -> False) result_list
+  let (next_next_world, next_next_pcdb, io_list, _, _) =
+        foldl _resolveActionResult (next_world, next_pcdb, [], [], server) $
+        filter (\result -> case result of
+                                PcStatusChange _ _ -> False
+                                NpcStatusChange _ _ -> False
+                                _ -> True) result_list
+  let (final_world, final_pcdb, io_list_dead, _) = charaDeadCheck server next_next_world next_next_pcdb
+  mapM_ (\x -> do _ <- x; return ()) $
+    (reverse io_list_self) ++ (reverse io_list) ++ (reverse io_list_dead)
+  return (final_world, final_pcdb)
+
 
 _resolveActionResult ::
   (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [TriggeredEvernt], NS.SimpleTCPServer) ->ActionResult ->
@@ -214,7 +224,7 @@ _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, e
                     reverse $ sendLookMessagesToCanSeePosPc server phimap pos cidset new_pcset
                               (map snd new_pcset) (map snd (snd npcset)) in
               (PhiWorld (phimap, new_cidset, new_pcset, npcset), new_pcdb,
-                         new_io_list ++ io : io_list, event_list, server)
+                         io : new_io_list ++ io_list, event_list, server)
     ForceDisconnect cid ->
       let io = NS.disconnectClient server cid in
       (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io:io_list, event_list, server)
@@ -256,3 +266,56 @@ sightWidth :: Int
 sightWidth = 7
 sightHeight :: Int
 sightHeight = 7
+
+
+charaDeadCheck ::
+  NS.SimpleTCPServer -> PhiWorld -> PCD.PlayerCharacterDB ->
+  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [TriggeredEvernt])
+charaDeadCheck server (PhiWorld (phimap, cidset, pcset, npcset)) pcdb =
+  let (next_cidset, next_pcset, next_pcdb, io_list_pc, _) =
+        foldl pcDeadCheck (cidset, pcset, pcdb, [], server) (map snd pcset) in
+  let (PhiWorld (_, _, _, next_npcset), io_list_npc, _) =
+        foldl npcDeadCheck
+          (PhiWorld (phimap, next_cidset, next_pcset, npcset), [], server) (map snd $ snd npcset) in
+  (PhiWorld (phimap, next_cidset, next_pcset, next_npcset), next_pcdb, io_list_pc ++ io_list_npc, [])
+
+npcDeadCheck :: (PhiWorld, [IO Bool], NS.SimpleTCPServer) -> NPC.NonPlayerCharacter->
+                (PhiWorld, [IO Bool], NS.SimpleTCPServer)
+npcDeadCheck (PhiWorld (phimap, cidset, pcset, npcset), io_list, server) npc =
+  if CH.isDead npc
+     then let lastInjuredName = case CH.getLastInjured npc of
+                Nothing -> "Assertion error (npcDeadCheck): dead npc doesn't have last injured."
+                Just (CH.IBPc ibpc) -> CH.getName ibpc
+                Just (CH.IBNpc ibnpc) -> CH.getName ibnpc in
+          let cansee_pc_list = filter (CH.canSee phimap (CH.getPosition npc)) (map snd pcset) in
+          let new_io_list = map (\cspc ->
+                                  let cid = case reverseLookUp (PC.getPhirc cspc) cidset of
+                                        Nothing ->
+                                         error "Assertion error (npcDeadCheck): pc doesn't hvae client"
+                                        Just x -> x in
+                                  NS.sendMessageTo server cid $ DM.makeDmMessage $
+                                  DM.KillBy (CH.getName npc) lastInjuredName)
+                            cansee_pc_list in
+          let next_npcset = (fst npcset, delFromAL (snd npcset) (NPC.getNpcId npc)) in
+          (PhiWorld (phimap, cidset, pcset, next_npcset), new_io_list ++ io_list, server)
+     else (PhiWorld (phimap, cidset, pcset, npcset), io_list, server)
+
+pcDeadCheck :: (ClientIDSet, PcSet, PCD.PlayerCharacterDB, [IO Bool], NS.SimpleTCPServer) ->
+               PC.PlayerCharacter ->
+               (ClientIDSet, PcSet, PCD.PlayerCharacterDB, [IO Bool], NS.SimpleTCPServer)
+pcDeadCheck (cidset, pcset, pcdb, io_list, server) pc =
+  if CH.isDead pc
+     then let phirc = PC.getPhirc pc in
+          let cid = case reverseLookUp phirc cidset of
+                Nothing -> error "Assertion error (pcDeadCheck): pc doesn't have client"
+                Just x -> x in
+          let new_io_list = [NS.disconnectClient server cid,
+                             NS.sendMessageTo server cid $ PE.encodeProtocol PE.Close,
+                             NS.sendMessageTo server cid $ DM.makeDmMessage DM.Savedata,
+                             NS.sendMessageTo server cid $ DM.makeDmMessage DM.Tryagain,
+                             NS.sendMessageTo server cid $ DM.makeDmMessage DM.Dead] in
+          let next_cidset = delFromAL cidset cid in
+          let next_pcset = delFromAL pcset phirc in
+          let next_pcdb = PCD.savePc pcdb phirc pc in
+          (next_cidset, next_pcset, next_pcdb, new_io_list ++ io_list, server)
+     else (cidset, pcset, pcdb, io_list, server)

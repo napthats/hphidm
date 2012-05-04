@@ -5,8 +5,9 @@ module Chara
          getCharaInRegion,
         ) where
 
-import qualified PhiMap as PM
 import Data.List (elemIndex, findIndex, find)
+import qualified PhiMap as PM
+import qualified Combat as CO
 
 
 data CharaView = CharaView Int Int PM.RelativeDirection String deriving (Show)
@@ -43,12 +44,14 @@ class Chara a where
   getCharaView :: PM.AbsoluteDirection -> (Int, Int, a) -> CharaView
   getName :: a -> String
   getSight :: PM.PhiMap -> a -> [[PM.Position]]
+  hitTo :: Chara b => a -> b -> (a, b, CO.CombatResult)
+  getHitRange :: PM.PhiMap -> a -> [PM.Position]
 
 getCharaInRegion :: (Chara a) => [[PM.Position]] -> [a] -> [(Int, Int, a)]
 getCharaInRegion pos_list chara_list =
   let pos_chara_list =
         map (\chara -> getSucceedOrd (map (elemIndex (getPosition chara)) pos_list) chara) chara_list
-  in map (\x -> case x of Nothing -> undefined; Just y -> y) $
+  in map (\x -> case x of Nothing -> error "Assertion error: getCharaInRegion"; Just y -> y) $
      filter (\x -> case x of Nothing -> False; Just _ -> True) pos_chara_list
   where
     getSucceedOrd list chara =

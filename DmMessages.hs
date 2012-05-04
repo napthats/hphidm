@@ -12,6 +12,7 @@ data DmMessageType = GoNo
                    | NoCharacter
                    | AccessAlready
                    | ChangeClientFail
+                   | AttackHp String String String Int
                    | PcMessage String String
                      
 makeDmMessage :: DmMessageType -> String
@@ -23,3 +24,6 @@ makeDmMessage NoCharacter = " Your character is not here. "
 makeDmMessage AccessAlready = " You accessed already. "
 makeDmMessage ChangeClientFail = " Changing client is failed. "
 makeDmMessage (PcMessage name msg) = name ++ " > " ++ msg
+makeDmMessage (AttackHp name vsname method value) =
+  "DM > " ++ name ++ " attacked to " ++ vsname ++ " by " ++ method
+    ++ ". [/*color=-hp*/" ++ show value ++ "/*.*/ hp] "

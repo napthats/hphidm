@@ -12,6 +12,7 @@ data ClientProtocol = Open String
                     | Go PM.Direction
                     | Turn (Maybe PM.Direction)
                     | Exit
+                    | Hit
                     | RawMessage String
                     | UnknownProtocol
                     deriving (Show)
@@ -30,6 +31,7 @@ decodeClientMessage msg =
                           Just d -> Go d
       ["turn"] -> Turn Nothing
       ["turn", dir] -> Turn $ stringToDirection dir
+      ["hit"] -> Hit
       _ -> RawMessage raw_message
 
 stringToDirection :: String -> Maybe PM.Direction

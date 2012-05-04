@@ -49,6 +49,8 @@ instance C.Chara NonPlayerCharacter where
     C.CharaView x y (PM.calculateRelativeDirection dir $ C.getDirection npc) (C.getName npc)
   getSight phimap npc =
    PM.getVisiblePositions PM.All phimap (C.getPosition npc) (C.getDirection npc) sightWidth sightHeight
+  hitTo = undefined
+  getHitRange = undefined
 
 makeNonPlayerCharacter ::
   PM.Position -> PM.AbsoluteDirection -> String -> Int -> NpcId -> NonPlayerCharacter

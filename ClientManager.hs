@@ -66,6 +66,7 @@ executeClientProtocol world pcdb cid protocol =
                   PW.MessageFromDm cid $ DM.makeDmMessage DM.Seeyou,
                   PW.MessageFromDm cid $ PE.encodeProtocol PE.Close,
                   PW.LogoutPc cid]
+      PD.Hit -> [PW.PcHit pc]
       PD.Open _ -> []
       PD.UnknownProtocol -> []
 

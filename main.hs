@@ -23,12 +23,13 @@ mainLoop ::
 mainLoop server world pcdb pre gen = do
   pc_action_result_list <- CM.resolveClientMessages server world pcdb
   let (npc_action_result_list, next_gen) = NPCM.resolveNpcActions world millisecondsPerFrame gen 
-  (new_world, new_pcdb) <-
+  (next_world, next_pcdb) <-
     PW.resolveActionResult server (pc_action_result_list ++ npc_action_result_list) world pcdb
+  let final_world = PW.addLivetimeAllNpc millisecondsPerFrame next_world
   cur <- getClockTime
   UM.delayForFramerate millisecondsPerFrame cur pre
   next_cur <- getClockTime
-  mainLoop server new_world new_pcdb next_cur next_gen
+  mainLoop server final_world next_pcdb next_cur next_gen
 
 millisecondsPerFrame :: Int
 millisecondsPerFrame = 100

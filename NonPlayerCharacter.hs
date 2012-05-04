@@ -7,7 +7,8 @@ module NonPlayerCharacter
          newNpcId,
          nextNpcId,
          makeNonPlayerCharacter,
-         addLiveTime,
+         addLivetime,
+         canActNext,
          getNpcId,
        ) where
 
@@ -68,14 +69,18 @@ getNpcId npc = npcId npc
 
 
 -- add livetime (milliseconds)
--- return new npc and whether npc ready to act or not
-addLiveTime :: Int -> NonPlayerCharacter -> (NonPlayerCharacter, Bool)
-addLiveTime dtime npc =
-  let speed = npcMillisecondsPerAction npc in
+addLivetime :: Int -> NonPlayerCharacter -> NonPlayerCharacter
+addLivetime dtime npc =
   let livetime = npcLivetime npc in
   let new_livetime = max 0 (livetime + dtime) in -- livetime turns to 0 if overflow occurs
-  let new_npc = NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = new_livetime, npcId = npcId npc, npcMhp = npcMhp npc, npcHp = npcHp npc, npcMmp = npcMmp npc, npcMp = npcMp npc, npcInjuredBy = npcInjuredBy npc} in
-  if (livetime `mod` speed) + dtime >= speed then (new_npc, True) else (new_npc, False)
+  NonPlayerCharacter {npcPosition = npcPosition npc, npcDirection = npcDirection npc, npcName = npcName npc, npcMillisecondsPerAction = npcMillisecondsPerAction npc, npcLivetime = new_livetime, npcId = npcId npc, npcMhp = npcMhp npc, npcHp = npcHp npc, npcMmp = npcMmp npc, npcMp = npcMp npc, npcInjuredBy = npcInjuredBy npc}
+
+-- return whether npc ready to act or not by next time (milliseconds)
+canActNext :: Int -> NonPlayerCharacter -> Bool
+canActNext dtime npc =
+  let speed = npcMillisecondsPerAction npc in
+  let livetime = npcLivetime npc in
+  (livetime `mod` speed) + dtime >= speed
 
 -- tentative
 sightWidth :: Int

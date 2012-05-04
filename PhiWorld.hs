@@ -13,6 +13,7 @@ module PhiWorld
          getNpcSet,
          resolveActionResult,
          makePhiWorld,
+         addLivetimeAllNpc,
        ) where
 
 import Data.List (find)
@@ -77,6 +78,7 @@ makePhiWorld =
   let phimap = PM.makePhiMap in
   let nid = NPC.newNpcId in
   PhiWorld (phimap, [], [], (nid, [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000), (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 100000 (NPC.nextNpcId nid) 2000 101 2000 100)]))
+--  PhiWorld (phimap, [], [], (nid, take 10000 $ iterate (\(cnid, _) -> (NPC.nextNpcId cnid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 (NPC.nextNpcId cnid) 1000 1000 1000 1000)) (nid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000)))
 
 
 resolveActionResult ::
@@ -319,3 +321,9 @@ pcDeadCheck (cidset, pcset, pcdb, io_list, server) pc =
           let next_pcdb = PCD.savePc pcdb phirc pc in
           (next_cidset, next_pcset, next_pcdb, new_io_list ++ io_list, server)
      else (cidset, pcset, pcdb, io_list, server)
+
+
+addLivetimeAllNpc :: Int -> PhiWorld -> PhiWorld
+addLivetimeAllNpc dtime (PhiWorld (phimap, cidset, pcset, npcset)) =
+  PhiWorld (phimap, cidset, pcset, (fst npcset, map (\(nid, npc) -> (nid, NPC.addLivetime dtime npc)) (snd npcset)))
+

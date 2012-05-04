@@ -23,17 +23,14 @@ executeNpcAction ::
   ([PW.ActionResult], g)
 executeNpcAction world npc action dtime gen =
   let phimap = PW.getPhiMap world in
-  case NPC.addLiveTime dtime npc of
-    (next_npc, True) ->
-      case action of
-        NPC.RandomMove ->
-          let (dir_ord, next_gen) = randomR (0, 3) gen in
-          let maybe_final_npc =
-                CH.walk phimap
-                  (PM.AbsoluteDirection $ [PM.North, PM.East, PM.West, PM.South] !! dir_ord) next_npc
-          in case maybe_final_npc of 
-            Nothing -> ([PW.NpcStatusChange PW.NPSCLivetime next_npc], next_gen)
-            Just final_npc -> ([PW.NpcStatusChange PW.NPSCLivetime next_npc,
-                                PW.NpcStatusChange PW.NPSCPosition final_npc], next_gen)
-    (next_npc, False) ->
-      ([PW.NpcStatusChange PW.NPSCLivetime next_npc], gen)
+  if NPC.canActNext dtime npc
+  then case action of
+    NPC.RandomMove ->
+      let (dir_ord, next_gen) = randomR (0, 3) gen in
+      let maybe_final_npc =
+            CH.walk phimap
+            (PM.AbsoluteDirection $ [PM.North, PM.East, PM.West, PM.South] !! dir_ord) npc
+      in case maybe_final_npc of
+        Nothing -> ([], next_gen)
+        Just final_npc -> ([PW.NpcStatusChange PW.NPSCPosition final_npc], next_gen)
+  else ([], gen)

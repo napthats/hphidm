@@ -176,6 +176,7 @@ mapChipToViewChip map_chip =
         Wwall -> VWwall
   in ViewChip {viewType = view_type, viewOptions = []}
   
+-- can return invalid Position (for example, outside of tha map)
 getNextPosition :: PhiMap -> Position -> AbsoluteDirection -> Position
 getNextPosition _ pos adir =
   case adir of

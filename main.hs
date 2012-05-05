@@ -6,7 +6,7 @@ import qualified Network.SimpleTCPServer as NS
 import qualified PlayerCharacterDB as PCD
 import qualified PhiWorld as PW
 import qualified NonPlayerCharacterManager as NPCM
-
+import qualified Event as EV
 
 main :: IO ()
 main = do
@@ -16,20 +16,29 @@ main = do
   pcdb <- PCD.makePcDB phimap
   cur <- getClockTime
   gen <- getStdGen
-  mainLoop server world pcdb cur gen
+  mainLoop server world pcdb cur gen []
 
 mainLoop ::
-  RandomGen g => NS.SimpleTCPServer -> PW.PhiWorld -> PCD.PlayerCharacterDB -> ClockTime -> g -> IO ()
-mainLoop server world pcdb pre gen = do
-  pc_action_result_list <- CM.resolveClientMessages server world pcdb
-  let (npc_action_result_list, next_gen) = NPCM.resolveNpcActions world millisecondsPerFrame gen 
-  (next_world, next_pcdb) <-
-    PW.resolveActionResult server (pc_action_result_list ++ npc_action_result_list) world pcdb
-  let final_world = PW.addLivetimeAllNpc millisecondsPerFrame next_world
-  cur <- getClockTime
-  UM.delayForFramerate millisecondsPerFrame cur pre
-  next_cur <- getClockTime
-  mainLoop server final_world next_pcdb next_cur next_gen
+  RandomGen g =>
+  NS.SimpleTCPServer -> PW.PhiWorld -> PCD.PlayerCharacterDB -> ClockTime -> g -> [EV.TriggeredEvent]->
+  IO ()
+mainLoop server world pcdb pre_time gen event_list = do
+  (next_world, next_pcdb, new_event_list_chained)<- PW.resolveActionResult server event_list world pcdb
+  
+  pc_action_result_list <- CM.resolveClientMessages server next_world next_pcdb
+  let (npc_action_result_list, next_gen) = NPCM.resolveNpcActions next_world millisecondsPerFrame gen 
+  (pre_final_world, final_pcdb, new_event_list) <-
+    PW.resolveActionResult server (pc_action_result_list++npc_action_result_list) next_world next_pcdb
+  
+  let final_world = PW.addLivetimeAllNpc millisecondsPerFrame pre_final_world
+  
+  cur_time <- getClockTime
+  UM.delayForFramerate millisecondsPerFrame cur_time pre_time
+  next_cur_time <- getClockTime
+  
+  mainLoop server final_world final_pcdb next_cur_time next_gen $
+    new_event_list_chained ++ new_event_list
+
 
 millisecondsPerFrame :: Int
 millisecondsPerFrame = 100

@@ -28,24 +28,8 @@ import qualified PhiMap as PM
 import qualified DmMessages as DM
 import qualified ProtocolEncoder as PE
 import qualified Combat as CO
-
-
-type Phirc = String
--- some of them triger other actions
--- for example, PcStatusChange about pos or dir cause othre pc's MessageFromDm about around view
-data ActionResult = 
-  NewPc NS.ClientID Phirc PC.PlayerCharacter
-  | PcStatusChange PcStatusChangeType Phirc (PC.PlayerCharacter -> Maybe PC.PlayerCharacter)
-  | NpcStatusChange NpcStatusChangeType NPC.NpcId (NPC.NonPlayerCharacter -> Maybe NPC.NonPlayerCharacter)
-  | MessageFromDm NS.ClientID String
-  | MessageFromPc PC.PlayerCharacter PC.PlayerCharacter String
-  | LogoutPc NS.ClientID
-  | PcHit PC.PlayerCharacter
-  | ForceDisconnect NS.ClientID
-data PcStatusChangeType = PSCDirection | PSCPosition deriving (Show)
-data NpcStatusChangeType = NPSCDirection | NPSCPosition deriving (Show)
-
-data TriggeredEvernt = Tentative deriving (Show)
+import qualified Event as EV
+import PhiWorldData
 
 
 newtype PhiWorld = PhiWorld (PM.PhiMap, ClientIDSet, PcSet, NpcSet)
@@ -78,25 +62,27 @@ makePhiWorld :: PhiWorld
 makePhiWorld = 
   let phimap = PM.makePhiMap in
   let nid = NPC.newNpcId in
-  PhiWorld (phimap, [], Map.empty, (nid, Map.fromList [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000), (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 100000 (NPC.nextNpcId nid) 2000 101 2000 100)]))
+  PhiWorld (phimap, [], Map.empty, (nid, Map.fromList []))
+--  PhiWorld (phimap, [], Map.empty, (nid, Map.fromList [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000), (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 100000 (NPC.nextNpcId nid) 2000 101 2000 100)]))
 --  PhiWorld (phimap, [], Map.empty, (nid, Map.fromList $ take 10000 $ iterate (\(cnid, _) -> (NPC.nextNpcId cnid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 (NPC.nextNpcId cnid) 1000 1000 1000 1000)) (nid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000)))
 
-
+-- resolve ActionResult from left to right
 resolveActionResult ::
   NS.SimpleTCPServer -> [ActionResult] -> PhiWorld -> PCD.PlayerCharacterDB ->
-  IO (PhiWorld, PCD.PlayerCharacterDB)
+  IO (PhiWorld, PCD.PlayerCharacterDB, [EV.TriggeredEvent])
 resolveActionResult server result_list phiworld pcdb = do
-  let (next_world, next_pcdb, io_list, _, _) =
+  let (next_world, next_pcdb, io_list, event_list, _) =
         foldl _resolveActionResult (phiworld, pcdb, [], [], server) $ result_list
   let (final_world, final_pcdb, io_list_dead, _) = charaDeadCheck server next_world next_pcdb
   mapM_ (\x -> do _ <- x; return ()) $
     (reverse io_list) ++ (reverse io_list_dead)
-  return (final_world, final_pcdb)
+  return (final_world, final_pcdb, event_list)
 
 
 _resolveActionResult ::
-  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [TriggeredEvernt], NS.SimpleTCPServer) ->ActionResult ->
-  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [TriggeredEvernt], NS.SimpleTCPServer)
+  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [EV.TriggeredEvent], NS.SimpleTCPServer) ->
+  ActionResult ->
+  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [EV.TriggeredEvent], NS.SimpleTCPServer)
 _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server) result =
   case result of
     NewPc cid phirc pc ->
@@ -137,8 +123,9 @@ _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, e
                         reverse $
                         sendLookMessagesToCanSeePosPc server phimap pos cidset new_pcset
                         (Map.elems new_pcset) (Map.elems (snd npcset)) in
+                  let new_event_list = EV.getTriggeredEvent (EV.PcPositionChange phimap new_pc) in
                   (PhiWorld (phimap, cidset, new_pcset, npcset), pcdb,
-                   new_io_list ++ io_list, event_list, server)          
+                   new_io_list ++ io_list, new_event_list ++ event_list, server)          
     NpcStatusChange sctype nid npc_change ->
       case Map.lookup nid (snd npcset) of
         Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server)
@@ -279,7 +266,7 @@ sightHeight = 7
 
 charaDeadCheck ::
   NS.SimpleTCPServer -> PhiWorld -> PCD.PlayerCharacterDB ->
-  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [TriggeredEvernt])
+  (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [EV.TriggeredEvent])
 charaDeadCheck server (PhiWorld (phimap, cidset, pcset, npcset)) pcdb =
   let (next_cidset, next_pcset, next_pcdb, io_list_pc, _) =
         foldl pcDeadCheck (cidset, pcset, pcdb, [], server) (Map.elems pcset) in

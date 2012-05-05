@@ -165,51 +165,52 @@ _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, e
                   (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
                    new_io_list ++ io_list, event_list, server)
     PcHit pc ->
-      let hitrange = CH.getHitRange phimap pc in
-      let target_pc_list = filter (\tpc -> any (== CH.getPosition tpc) hitrange) (Map.elems pcset) in
-      let target_npc_list =
-            filter (\tnpc -> any (== CH.getPosition tnpc) hitrange) (Map.elems (snd npcset)) in
-      let (next_pc, final_target_pc_combat_list) =
-            foldl (\(cur_pc, vspc_list) cur_vspc -> 
-                    let (_next_pc, next_vspc, combat_result) = CH.hitTo cur_pc cur_vspc in
-                    (_next_pc, (next_vspc, combat_result) : vspc_list)
-                  ) (pc, []) target_pc_list in
-      let (final_pc, final_target_npc_combat_list) =
-            foldl (\(cur_pc, vsnpc_list) cur_vsnpc -> 
-                    let (_next_pc, next_vsnpc, combat_result) = CH.hitTo cur_pc cur_vsnpc in
-                    (_next_pc, (next_vsnpc, combat_result) : vsnpc_list)
-                  ) (next_pc, []) target_npc_list in
-      let new_pcset = foldl (\cur_pcset new_pc -> Map.insert (PC.getPhirc new_pc) new_pc cur_pcset)
-                            pcset (final_pc : map fst final_target_pc_combat_list) in
-      let new_npcset_snd =
-            foldl (\cur_npcset new_npc -> Map.insert (NPC.getNpcId new_npc) new_npc cur_npcset)
-            (snd npcset) (map fst final_target_npc_combat_list) in
-      let new_npcset = (fst npcset, new_npcset_snd) in
-      let cid = case reverseLookUp (PC.getPhirc pc) cidset of
-            Nothing -> error "Assertion error: pc doesn't have client"         
-            Just x -> x in
-      let new_io_list_pc = 
-            concat $ map (\cresult ->
-                           map (\dm_type -> NS.sendMessageTo server cid $ DM.makeDmMessage dm_type)
-                           (CO.makeDmMessageTypeList cresult))
-            $ (map snd final_target_pc_combat_list) ++ (map snd final_target_npc_combat_list) in
-      let new_io_list_target =
-            concat $ map (\(tpc, cresult) ->
-                           let tcid = case reverseLookUp (PC.getPhirc tpc) cidset of
-                                 Nothing -> error "Assertion error: pc doesn't have client"         
-                                 Just x -> x in
-                           map (\dm_type -> NS.sendMessageTo server tcid $ DM.makeDmMessage dm_type)
-                           (CO.makeDmMessageTypeList cresult))
-            $ final_target_pc_combat_list in
-      (PhiWorld (phimap, cidset, new_pcset, new_npcset), pcdb,
-       new_io_list_pc ++ new_io_list_target ++ io_list, event_list, server)                
+      case reverseLookUp (PC.getPhirc pc) cidset of
+        Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server)
+        Just cid ->
+          let hitrange = CH.getHitRange phimap pc in
+          let target_pc_list =
+                filter (\tpc -> any (== CH.getPosition tpc) hitrange) (Map.elems pcset) in
+          let target_npc_list =
+                filter (\tnpc -> any (== CH.getPosition tnpc) hitrange) (Map.elems (snd npcset)) in
+          let (next_pc, final_target_pc_combat_list) =
+                foldl (\(cur_pc, vspc_list) cur_vspc -> 
+                        let (_next_pc, next_vspc, combat_result) = CH.hitTo cur_pc cur_vspc in
+                        (_next_pc, (next_vspc, combat_result) : vspc_list)
+                      ) (pc, []) target_pc_list in
+          let (final_pc, final_target_npc_combat_list) =
+                foldl (\(cur_pc, vsnpc_list) cur_vsnpc -> 
+                        let (_next_pc, next_vsnpc, combat_result) = CH.hitTo cur_pc cur_vsnpc in
+                        (_next_pc, (next_vsnpc, combat_result) : vsnpc_list)
+                      ) (next_pc, []) target_npc_list in
+          let new_pcset = foldl (\cur_pcset new_pc -> Map.insert (PC.getPhirc new_pc) new_pc cur_pcset)
+                          pcset (final_pc : map fst final_target_pc_combat_list) in
+          let new_npcset_snd =
+                foldl (\cur_npcset new_npc -> Map.insert (NPC.getNpcId new_npc) new_npc cur_npcset)
+                (snd npcset) (map fst final_target_npc_combat_list) in
+          let new_npcset = (fst npcset, new_npcset_snd) in
+          let new_io_list_pc = 
+                concat $ map (\cresult ->
+                               map (\dm_type -> NS.sendMessageTo server cid $ DM.makeDmMessage dm_type)
+                               (CO.makeDmMessageTypeList cresult))
+                $ (map snd final_target_pc_combat_list) ++ (map snd final_target_npc_combat_list) in
+          let new_io_list_target =
+                concat $ map (\(tpc, cresult) ->
+                               let tcid = case reverseLookUp (PC.getPhirc tpc) cidset of
+                                     Nothing -> error "Assertion error: pc doesn't have client"
+                                     Just x -> x in
+                               map (\dm_type-> NS.sendMessageTo server tcid $ DM.makeDmMessage dm_type)
+                               (CO.makeDmMessageTypeList cresult))
+                $ final_target_pc_combat_list in
+          (PhiWorld (phimap, cidset, new_pcset, new_npcset), pcdb,
+           new_io_list_pc ++ new_io_list_target ++ io_list, event_list, server)                
     MessageFromDm cid msg ->
       -- ignore disconnected client
       let io = NS.sendMessageTo server cid msg in
       (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io:io_list, event_list, server)
     MessageFromPc opc dpc msg ->
       case reverseLookUp (PC.getPhirc dpc) cidset of
-        Nothing -> error "Assertion error: pc doesn't have client."
+        Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server)
         Just dcid ->
           let io = NS.sendMessageTo server dcid $
                    DM.makeDmMessage (DM.PcMessage (CH.getName opc) msg)

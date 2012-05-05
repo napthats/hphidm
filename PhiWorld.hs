@@ -85,17 +85,33 @@ _resolveActionResult ::
   (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [EV.TriggeredEvent], NS.SimpleTCPServer, EV.SwitchDB)
 _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server, swdb) result =
   case result of
-    NewPc cid phirc pc ->
-      let new_cidset = addToAL cidset cid phirc in
-      let new_pcset = Map.insert phirc pc pcset in
-      let pos = CH.getPosition pc in
-      let new_io_list = 
-            reverse $
-            sendLookMessagesToCanSeePosPc server phimap pos new_cidset new_pcset
-            (Map.elems new_pcset) (Map.elems (snd npcset)) in
-      let new_event_list = EV.getTriggeredEvent swdb (EV.PcPositionChange phimap pc) in
-      (PhiWorld (phimap, new_cidset, new_pcset, npcset), pcdb,
-                 new_io_list ++ io_list, new_event_list ++ event_list, server, swdb)
+    NewPc cid phirc ->
+      case Map.lookup phirc pcset of
+        Just _ ->
+          let new_io_list = [NS.sendMessageTo server cid $ PE.encodeProtocol PE.X,
+                             NS.sendMessageTo server cid $ DM.makeDmMessage DM.ChangeClientFail,
+                             NS.sendMessageTo server cid $ DM.makeDmMessage DM.AccessAlready] in
+          let new_event = ForceDisconnect cid in
+          (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+           new_io_list ++ io_list, new_event : event_list, server, swdb)
+        Nothing -> case PCD.loadPc pcdb phirc of
+          Nothing ->
+            let new_io_list = [NS.sendMessageTo server cid $ PE.encodeProtocol PE.X,
+                               NS.sendMessageTo server cid $ DM.makeDmMessage DM.NoCharacter] in
+            let new_event = ForceDisconnect cid in
+            (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+             new_io_list ++ io_list, new_event : event_list, server, swdb)                     
+          Just pc ->
+            let new_cidset = addToAL cidset cid phirc in
+            let new_pcset = Map.insert phirc pc pcset in
+            let pos = CH.getPosition pc in
+            let new_io_list = 
+                  reverse $
+                  sendLookMessagesToCanSeePosPc server phimap pos new_cidset new_pcset
+                  (Map.elems new_pcset) (Map.elems (snd npcset)) in
+            let new_event_list = EV.getTriggeredEvent swdb (EV.PcPositionChange phimap pc) in
+            (PhiWorld (phimap, new_cidset, new_pcset, npcset), pcdb,
+             new_io_list ++ io_list, new_event_list ++ event_list, server, swdb)
     PcStatusChange sctype phirc pc_change ->
       case Map.lookup phirc pcset of
         Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server, swdb)

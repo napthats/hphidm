@@ -13,7 +13,7 @@ import qualified Network.SimpleTCPServer as NS
 
 type Phirc = String
 data ActionResult = 
-  NewPc NS.ClientID Phirc PC.PlayerCharacter
+  NewPc NS.ClientID Phirc
   | PcStatusChange PcStatusChangeType Phirc (PC.PlayerCharacter -> Maybe PC.PlayerCharacter)
   | NpcStatusChange NpcStatusChangeType NPC.NpcId (NPC.NonPlayerCharacter -> Maybe NPC.NonPlayerCharacter)
   | MessageFromDm NS.ClientID String

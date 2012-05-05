@@ -6,7 +6,6 @@ module ClientManager
 import qualified Data.Map as Map
 import qualified Network.SimpleTCPServer as NS
 --import qualified PlayerCharacter as PC hiding (makePlayerCharacter)
-import qualified PlayerCharacterDB as PCD
 import qualified PlayerCharacter as PC
 import qualified Chara as CH
 import qualified PhiMap as PM
@@ -17,16 +16,16 @@ import qualified PhiWorld as PW
 
 
 resolveClientMessages ::
-  NS.SimpleTCPServer -> PW.PhiWorld -> PCD.PlayerCharacterDB -> IO [PW.ActionResult]
-resolveClientMessages server phiworld pcdb = do
+  NS.SimpleTCPServer -> PW.PhiWorld -> IO [PW.ActionResult]
+resolveClientMessages server phiworld = do
   msg_list <- NS.getEachClientMessages server
   let protocol_list = map (\(cid, msg) -> (cid, PD.decodeClientMessage msg)) msg_list
-  return $ concat $ map (\(cid, p) -> executeClientProtocol phiworld pcdb cid p) protocol_list
+  return $ concat $ map (\(cid, p) -> executeClientProtocol phiworld cid p) protocol_list
 
 -- returned results have to be excuted in an order of the list
 executeClientProtocol ::
-  PW.PhiWorld -> PCD.PlayerCharacterDB -> NS.ClientID -> PD.ClientProtocol -> [PW.ActionResult]
-executeClientProtocol world pcdb cid protocol =
+  PW.PhiWorld -> NS.ClientID -> PD.ClientProtocol -> [PW.ActionResult]
+executeClientProtocol world cid protocol =
   let phimap = PW.getPhiMap world in
   let cidset = PW.getClientIDSet world in
   let pcset = PW.getPcSet world in
@@ -37,16 +36,7 @@ executeClientProtocol world pcdb cid protocol =
           Just pc -> Just pc
   in case maybe_pc of
     Nothing -> case protocol of
-      PD.Open phirc -> case Map.lookup phirc pcset of
-        Just _ -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.AccessAlready,
-                   PW.MessageFromDm cid $ DM.makeDmMessage DM.ChangeClientFail,
-                   PW.MessageFromDm cid $ PE.encodeProtocol PE.X,
-                   PW.ForceDisconnect cid]
-        Nothing -> case PCD.loadPc pcdb phirc of
-          Nothing -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.NoCharacter,
-                      PW.MessageFromDm cid $ PE.encodeProtocol PE.X,
-                      PW.ForceDisconnect cid]
-          Just new_pc -> [PW.NewPc cid phirc new_pc]
+      PD.Open phirc -> [PW.NewPc cid phirc]
       -- ignore world trans
       _ -> []
     Just pc -> case protocol of

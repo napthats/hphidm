@@ -3,6 +3,7 @@ module ClientManager
          resolveClientMessages,
        ) where
 
+import qualified Data.Map as Map
 import qualified Network.SimpleTCPServer as NS
 --import qualified PlayerCharacter as PC hiding (makePlayerCharacter)
 import qualified PlayerCharacterDB as PCD
@@ -30,12 +31,12 @@ executeClientProtocol world pcdb cid protocol =
   let pcset = PW.getPcSet world in
   let maybe_pc = case lookup cid cidset of 
         Nothing -> Nothing
-        Just phirc -> case lookup phirc pcset of
+        Just phirc -> case Map.lookup phirc pcset of
           Nothing -> error "PlayerCharacter is unregistered in PcSet"
           Just pc -> Just pc
   in case maybe_pc of
     Nothing -> case protocol of
-      PD.Open phirc -> case lookup phirc pcset of
+      PD.Open phirc -> case Map.lookup phirc pcset of
         Just _ -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.AccessAlready,
                    PW.MessageFromDm cid $ DM.makeDmMessage DM.ChangeClientFail,
                    PW.MessageFromDm cid $ PE.encodeProtocol PE.X,
@@ -60,7 +61,7 @@ executeClientProtocol world pcdb cid protocol =
       PD.RawMessage msg ->
         let visible_pos_list = PM.getVisiblePositions PM.All phimap
                                (CH.getPosition pc) (CH.getDirection pc) sightWidth sightHeight
-        in let visible_chara_list = CH.getCharaInRegion visible_pos_list (map snd pcset) in
+        in let visible_chara_list = CH.getCharaInRegion visible_pos_list (Map.elems pcset) in
         map (\(_, _, vchara) -> PW.MessageFromPc pc vchara msg) visible_chara_list
       PD.Exit -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.Savedata,
                   PW.MessageFromDm cid $ DM.makeDmMessage DM.Seeyou,

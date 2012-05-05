@@ -10,7 +10,7 @@ module CharaData
 import qualified PhiMap as PM
 
 
-newtype NpcId = NpcId Integer deriving (Eq, Show)
+newtype NpcId = NpcId Integer deriving (Eq, Show, Ord)
 
 newNpcId :: NpcId
 newNpcId = NpcId 0

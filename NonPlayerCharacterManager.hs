@@ -4,6 +4,7 @@ module NonPlayerCharacterManager
        ) where
 
 import System.Random (RandomGen, randomR)
+import qualified Data.Map as Map
 import qualified PhiWorld as PW
 import qualified PhiMap as PM
 import qualified NonPlayerCharacter as NPC
@@ -13,7 +14,7 @@ import qualified Chara as CH
 resolveNpcActions :: RandomGen g => PW.PhiWorld -> Int -> g -> ([PW.ActionResult], g)
 resolveNpcActions world dtime gen =
   let npcset = PW.getNpcSet world in
-  let npc_action_set = map (\npc -> (npc, NPC.chooseAction npc)) $ map snd (snd npcset) in
+  let npc_action_set = map (\npc -> (npc, NPC.chooseAction npc)) $ Map.elems (snd npcset) in
   foldr (\(npc, action) (list, g) ->
           let (result, new_g) = executeNpcAction world npc action dtime g in
           (result ++ list, new_g)) ([], gen) npc_action_set

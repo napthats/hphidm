@@ -22,4 +22,4 @@ data ActionResult =
   | PcHit PC.PlayerCharacter
   | ForceDisconnect NS.ClientID
 data PcStatusChangeType = PSCDirection | PSCPosition deriving (Show)
-data NpcStatusChangeType = NPSCDirection | NPSCPosition deriving (Show)
+data NpcStatusChangeType = NSCDirection | NSCPosition deriving (Show)

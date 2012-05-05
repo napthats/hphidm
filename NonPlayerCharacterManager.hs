@@ -31,5 +31,5 @@ executeNpcAction world npc action dtime gen =
       let change_npc =
             CH.walk phimap
             (PM.AbsoluteDirection $ [PM.North, PM.East, PM.West, PM.South] !! dir_ord) in
-      ([PW.NpcStatusChange PW.NPSCPosition (NPC.getNpcId npc) change_npc], next_gen)
+      ([PW.NpcStatusChange PW.NSCPosition (NPC.getNpcId npc) change_npc], next_gen)
   else ([], gen)

@@ -20,7 +20,11 @@ type TriggeredEvent = PWD.ActionResult
 
 getTriggeredEvent :: EventTrigger -> [TriggeredEvent]
 getTriggeredEvent (PcPositionChange phimap pc) =
-  if CH.getPosition pc == fromJust (PM.loadPosition phimap "0:0")
-     then [PWD.PcStatusChange PWD.PSCDirection (PC.getPhirc pc)
-          ((\c -> Just $ CH.changePosition (fromJust $ PM.loadPosition phimap "3:0") c))]
-     else []
+  let pos = CH.getPosition pc in
+  if pos == fromJust (PM.loadPosition phimap "0:0")
+     then [PWD.PcStatusChange PWD.PSCPosition (PC.getPhirc pc)
+          ((\c -> Just $ CH.changePosition (PM.getNextPosition phimap (CH.getPosition c) PM.East) c))]
+     else if CH.getPosition pc == fromJust (PM.loadPosition phimap "1:0")
+          then [PWD.PcStatusChange PWD.PSCPosition (PC.getPhirc pc)
+                ((\c -> Just $ CH.changePosition (PM.getNextPosition phimap (CH.getPosition c) PM.West) c))]
+          else []

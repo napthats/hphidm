@@ -35,15 +35,15 @@ type Phirc = String
 -- for example, PcStatusChange about pos or dir cause othre pc's MessageFromDm about around view
 data ActionResult = 
   NewPc NS.ClientID Phirc PC.PlayerCharacter
-  | PcStatusChange PcStatusChangeType PC.PlayerCharacter
-  | NpcStatusChange NpcStatusChangeType NPC.NonPlayerCharacter
+  | PcStatusChange PcStatusChangeType Phirc (PC.PlayerCharacter -> Maybe PC.PlayerCharacter)
+  | NpcStatusChange NpcStatusChangeType NPC.NpcId (NPC.NonPlayerCharacter -> Maybe NPC.NonPlayerCharacter)
   | MessageFromDm NS.ClientID String
   | MessageFromPc PC.PlayerCharacter PC.PlayerCharacter String
   | LogoutPc NS.ClientID
   | PcHit PC.PlayerCharacter
   | ForceDisconnect NS.ClientID
 data PcStatusChangeType = PSCDirection | PSCPosition deriving (Show)
-data NpcStatusChangeType = NPSCDirection | NPSCPosition | NPSCLivetime deriving (Show)
+data NpcStatusChangeType = NPSCDirection | NPSCPosition deriving (Show)
 
 data TriggeredEvernt = Tentative deriving (Show)
 
@@ -79,28 +79,18 @@ makePhiWorld =
   let phimap = PM.makePhiMap in
   let nid = NPC.newNpcId in
   PhiWorld (phimap, [], Map.empty, (nid, Map.fromList [(nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000), (NPC.nextNpcId nid,NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc2" 100000 (NPC.nextNpcId nid) 2000 101 2000 100)]))
---  PhiWorld (phimap, [], Map.empty, (nid, Map.fromList $ take 5000 $ iterate (\(cnid, _) -> (NPC.nextNpcId cnid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 (NPC.nextNpcId cnid) 1000 1000 1000 1000)) (nid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000)))
+--  PhiWorld (phimap, [], Map.empty, (nid, Map.fromList $ take 10000 $ iterate (\(cnid, _) -> (NPC.nextNpcId cnid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 (NPC.nextNpcId cnid) 1000 1000 1000 1000)) (nid, NPC.makeNonPlayerCharacter (PM.getDefaultPosition phimap) PM.East "npc1" 1000 nid 1000 1000 1000 1000)))
 
 
 resolveActionResult ::
   NS.SimpleTCPServer -> [ActionResult] -> PhiWorld -> PCD.PlayerCharacterDB ->
   IO (PhiWorld, PCD.PlayerCharacterDB)
 resolveActionResult server result_list phiworld pcdb = do
-  let (next_world, next_pcdb, io_list_self, _, _) =
-        foldl _resolveActionResult (phiworld, pcdb, [], [], server) $
-        filter (\result -> case result of
-                                PcStatusChange _ _ -> True 
-                                NpcStatusChange _ _ -> True
-                                _ -> False) result_list
-  let (next_next_world, next_next_pcdb, io_list, _, _) =
-        foldl _resolveActionResult (next_world, next_pcdb, [], [], server) $
-        filter (\result -> case result of
-                                PcStatusChange _ _ -> False
-                                NpcStatusChange _ _ -> False
-                                _ -> True) result_list
-  let (final_world, final_pcdb, io_list_dead, _) = charaDeadCheck server next_next_world next_next_pcdb
+  let (next_world, next_pcdb, io_list, _, _) =
+        foldl _resolveActionResult (phiworld, pcdb, [], [], server) $ result_list
+  let (final_world, final_pcdb, io_list_dead, _) = charaDeadCheck server next_world next_pcdb
   mapM_ (\x -> do _ <- x; return ()) $
-    (reverse io_list_self) ++ (reverse io_list) ++ (reverse io_list_dead)
+    (reverse io_list) ++ (reverse io_list_dead)
   return (final_world, final_pcdb)
 
 
@@ -119,25 +109,61 @@ _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, e
             (Map.elems new_pcset) (Map.elems (snd npcset)) in
       (PhiWorld (phimap, new_cidset, new_pcset, npcset), pcdb,
                  new_io_list ++ io_list, event_list, server)
-    PcStatusChange sctype pc ->
-      let phirc = PC.getPhirc pc in
-      let new_pcset = Map.insert phirc pc pcset in
-      let pos = CH.getPosition pc in
-      case sctype of
-        PSCDirection ->
-          let new_io_list =
-                reverse $
-                sendLookMessagesToCanSeePosPc server phimap pos cidset new_pcset
-                (Map.elems new_pcset) (Map.elems (snd npcset)) in
-          (PhiWorld (phimap, cidset, new_pcset, npcset), pcdb,
-                     new_io_list ++ io_list, event_list, server)
-        PSCPosition ->
-          let new_io_list =
-                reverse $
-                sendLookMessagesToCanSeePosPc server phimap pos cidset new_pcset
-                (Map.elems new_pcset) (Map.elems (snd npcset)) in
-          (PhiWorld (phimap, cidset, new_pcset, npcset), pcdb,
-           new_io_list ++ io_list, event_list, server)          
+    PcStatusChange sctype phirc pc_change ->
+      case Map.lookup phirc pcset of
+        Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server)
+        Just pc ->
+          case pc_change pc of
+            Nothing ->              
+              case reverseLookUp phirc cidset of
+                Nothing -> error "Assertion error (_resolveActionResult): pc doesn't have client."
+                Just cid ->
+                  let new_io = NS.sendMessageTo server cid $ DM.makeDmMessage DM.GoNo in
+                  (PhiWorld (phimap, cidset, pcset, npcset), pcdb, new_io:io_list, event_list, server)
+            Just new_pc ->
+              let new_pcset = Map.insert phirc new_pc pcset in
+              case sctype of
+                PSCDirection ->
+                  let pos = CH.getPosition new_pc in
+                  let new_io_list =
+                        reverse $
+                        sendLookMessagesToCanSeePosPc server phimap pos cidset new_pcset
+                        (Map.elems new_pcset) (Map.elems (snd npcset)) in
+                  (PhiWorld (phimap, cidset, new_pcset, npcset), pcdb,
+                   new_io_list ++ io_list, event_list, server)
+                PSCPosition ->
+                  let pos = CH.getPosition new_pc in
+                  let new_io_list =
+                        reverse $
+                        sendLookMessagesToCanSeePosPc server phimap pos cidset new_pcset
+                        (Map.elems new_pcset) (Map.elems (snd npcset)) in
+                  (PhiWorld (phimap, cidset, new_pcset, npcset), pcdb,
+                   new_io_list ++ io_list, event_list, server)          
+    NpcStatusChange sctype nid npc_change ->
+      case Map.lookup nid (snd npcset) of
+        Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server)
+        Just npc ->
+          case npc_change npc of
+            Nothing -> (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server)
+            Just new_npc ->
+              let new_npcset = (fst npcset, Map.insert nid new_npc (snd npcset)) in
+              case sctype of
+                NPSCDirection ->
+                  let pos = CH.getPosition new_npc in
+                  let new_io_list =
+                        reverse $
+                        sendLookMessagesToCanSeePosPc server phimap pos cidset pcset
+                        (Map.elems pcset) (Map.elems (snd new_npcset)) in
+                  (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
+                   new_io_list ++ io_list, event_list, server)
+                NPSCPosition ->
+                  let pos = CH.getPosition new_npc in
+                  let new_io_list =
+                        reverse $
+                        sendLookMessagesToCanSeePosPc server phimap pos cidset pcset
+                        (Map.elems pcset) (Map.elems (snd new_npcset)) in
+                  (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
+                   new_io_list ++ io_list, event_list, server)
     PcHit pc ->
       let hitrange = CH.getHitRange phimap pc in
       let target_pc_list = filter (\tpc -> any (== CH.getPosition tpc) hitrange) (Map.elems pcset) in
@@ -177,27 +203,6 @@ _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, e
             $ final_target_pc_combat_list in
       (PhiWorld (phimap, cidset, new_pcset, new_npcset), pcdb,
        new_io_list_pc ++ new_io_list_target ++ io_list, event_list, server)                
-    NpcStatusChange sctype npc ->
-      let nid = NPC.getNpcId npc in
-      let new_npcset = (fst npcset, Map.insert nid npc (snd npcset)) in
-      let pos = CH.getPosition npc in
-      case sctype of
-        NPSCDirection ->
-          let new_io_list =
-                reverse $
-                sendLookMessagesToCanSeePosPc server phimap pos cidset pcset
-                (Map.elems pcset) (Map.elems (snd new_npcset)) in
-          (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
-                     new_io_list ++ io_list, event_list, server)
-        NPSCPosition ->
-          let new_io_list =
-                reverse $
-                sendLookMessagesToCanSeePosPc server phimap pos cidset pcset
-                (Map.elems pcset) (Map.elems (snd new_npcset)) in
-          (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb,
-                     new_io_list ++ io_list, event_list, server)
-        NPSCLivetime ->
-          (PhiWorld (phimap, cidset, pcset, new_npcset), pcdb, io_list, event_list, server)
     MessageFromDm cid msg ->
       -- ignore disconnected client
       let io = NS.sendMessageTo server cid msg in
@@ -327,4 +332,3 @@ pcDeadCheck (cidset, pcset, pcdb, io_list, server) pc =
 addLivetimeAllNpc :: Int -> PhiWorld -> PhiWorld
 addLivetimeAllNpc dtime (PhiWorld (phimap, cidset, pcset, npcset)) =
   PhiWorld (phimap, cidset, pcset, (fst npcset, Map.map (\npc -> NPC.addLivetime dtime npc) (snd npcset)))
-

@@ -7,6 +7,7 @@ import qualified Data.Map as Map
 import qualified Network.SimpleTCPServer as NS
 --import qualified PlayerCharacter as PC hiding (makePlayerCharacter)
 import qualified PlayerCharacterDB as PCD
+import qualified PlayerCharacter as PC
 import qualified Chara as CH
 import qualified PhiMap as PM
 import qualified ProtocolDecoder as PD
@@ -49,14 +50,9 @@ executeClientProtocol world pcdb cid protocol =
       -- ignore world trans
       _ -> []
     Just pc -> case protocol of
-      PD.Go dir -> let maybe_modified_pc = CH.walk phimap dir pc in
-                   case maybe_modified_pc of
-                     Nothing -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.GoNo]
-                     Just modified_pc ->
-                       [PW.PcStatusChange PW.PSCPosition modified_pc]
+      PD.Go dir -> [PW.PcStatusChange PW.PSCPosition (PC.getPhirc pc) (CH.walk phimap dir)]
       PD.Turn maybe_dir -> case maybe_dir of
-        Just dir -> let modified_pc = CH.turn dir pc in
-                    [PW.PcStatusChange PW.PSCDirection modified_pc]
+        Just dir -> [PW.PcStatusChange PW.PSCDirection (PC.getPhirc pc) (CH.turn dir)]
         Nothing -> [PW.MessageFromDm cid $ DM.makeDmMessage DM.TurnBad]
       PD.RawMessage msg ->
         let visible_pos_list = PM.getVisiblePositions PM.All phimap

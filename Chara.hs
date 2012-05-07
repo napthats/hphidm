@@ -9,6 +9,7 @@ module Chara
 import Data.List (elemIndex, findIndex, find)
 import qualified PhiMap as PM
 import qualified Combat as CO
+import qualified Item as IT
 import CharaData
 
 
@@ -55,6 +56,9 @@ class Chara a where
   hitTo :: Chara b => a -> b -> (a, b, CO.CombatResult)
   getHitRange :: PM.PhiMap -> a -> [PM.Position]
   getLastInjured :: a -> Maybe InjuredBy
+  addItem :: IT.Item -> a -> a
+  deleteItem :: Int -> a -> Maybe (a, IT.Item)
+  getItemList :: a -> [IT.Item]
 
 getCharaInRegion :: (Chara a) => [[PM.Position]] -> [a] -> [(Int, Int, a)]
 getCharaInRegion pos_list chara_list =

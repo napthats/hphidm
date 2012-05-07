@@ -8,6 +8,7 @@ module CharaData
          newNpcId,
        ) where
 import qualified PhiMap as PM
+import qualified Item as IT
 
 
 newtype NpcId = NpcId Integer deriving (Eq, Show, Ord)
@@ -43,7 +44,8 @@ data PlayerCharacter = PlayerCharacter {
   pcHp :: Int,
   pcMmp :: Int,
   pcMp :: Int,
-  pcInjuredBy :: Maybe InjuredBy} deriving (Show)
+  pcInjuredBy :: Maybe InjuredBy,
+  pcItemList :: [IT.Item]} deriving (Show)
 
 data InjuredBy = IBPc PlayerCharacter 
                | IBNpc NonPlayerCharacter

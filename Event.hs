@@ -53,18 +53,21 @@ makeSwitchDB =
   SwitchDB ([(PSPositionChange,
              ((\phimap pc -> CH.getPosition pc == fromJust (PM.loadPosition phimap "0:0")),
               PWD.PSCPosition,
-              (\phimap pc -> Just $ CH.changePosition (PM.getNextPosition phimap (CH.getPosition pc) PM.East) pc))),
-            (PSPositionChange,
+              (\phimap pc -> 
+                case PM.getNextValidPosition phimap (CH.getPosition pc) PM.East of
+                  Nothing -> Nothing
+                  Just next_pos -> Just $ CH.changePosition next_pos pc))),
+             (PSPositionChange,
              ((\phimap pc -> CH.getPosition pc == fromJust (PM.loadPosition phimap "1:0")),
               PWD.PSCPosition,
-              (\phimap pc -> Just $ CH.changePosition (PM.getNextPosition phimap (CH.getPosition pc) PM.West) pc)))],           
-           [(NSPositionChange,
-             ((\phimap npc -> CH.getPosition npc == fromJust (PM.loadPosition phimap "0:0")),
+              (\phimap pc -> 
+                case PM.getNextValidPosition phimap (CH.getPosition pc) PM.West of
+                  Nothing -> Nothing
+                  Just next_pos -> Just $ CH.changePosition next_pos pc)))],
+             [(NSPositionChange,
+             ((\phimap pc -> CH.getPosition pc == fromJust (PM.loadPosition phimap "0:0")),
               PWD.NSCPosition,
-              (\phimap npc -> Just $ CH.changePosition (PM.getNextPosition phimap (CH.getPosition npc) PM.East) npc))),
-            (NSPositionChange,
-             ((\phimap npc -> CH.getPosition npc == fromJust (PM.loadPosition phimap "1:0")),
-              PWD.NSCPosition,
-              (\phimap npc -> Just $ CH.changePosition (PM.getNextPosition phimap (CH.getPosition npc) PM.West) npc)))])
-
-
+              (\phimap pc -> 
+                case PM.getNextValidPosition phimap (CH.getPosition pc) PM.West of
+                  Nothing -> Nothing
+                  Just next_pos -> Just $ CH.changePosition next_pos pc)))])

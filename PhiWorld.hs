@@ -7,6 +7,7 @@ module PhiWorld
          PcSet,
          PhiWorld(),
          Phirc,
+         CharaInstance(..),
          getPhiMap,
          getClientIDSet,
          getPcSet,
@@ -16,7 +17,8 @@ module PhiWorld
          addLivetimeAllNpc,
        ) where
 
-import Data.List (find)
+import Data.List (find, findIndex)
+import Data.Maybe (fromJust)
 import Data.List.Utils (addToAL, delFromAL)
 import qualified Data.Map as Map
 import qualified Network.SimpleTCPServer as NS
@@ -29,6 +31,7 @@ import qualified DmMessages as DM
 import qualified ProtocolEncoder as PE
 import qualified Combat as CO
 import qualified Event as EV
+import qualified Item as IT
 import PhiWorldData
 
 
@@ -85,6 +88,65 @@ _resolveActionResult ::
   (PhiWorld, PCD.PlayerCharacterDB, [IO Bool], [EV.TriggeredEvent], NS.SimpleTCPServer, EV.SwitchDB)
 _resolveActionResult (PhiWorld (phimap, cidset, pcset, npcset), pcdb, io_list, event_list, server, swdb) result =
   case result of
+    GetItem chara_instance maybe_item_name ->
+      case chara_instance of
+        Pc pc cid ->
+          let pos = CH.getPosition pc in
+          let floor_item_list = PM.getItemList phimap pos in
+          case maybe_item_name of
+            Nothing ->
+              let new_io = NS.sendMessageTo server cid $
+                           DM.makeDmMessage $ DM.List (map IT.getName floor_item_list) in
+              (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+               new_io : io_list, event_list, server, swdb)
+            Just item_name ->
+              case findIndex (\item -> IT.getName item == item_name) floor_item_list of
+                Nothing ->
+                  let new_io = NS.sendMessageTo server cid $ DM.makeDmMessage DM.GetBad in
+                  (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+                   new_io : io_list, event_list, server, swdb)
+                Just item_ord ->
+                  let (new_phimap, item) = fromJust $ PM.deleteItem pos item_ord phimap in
+                  let new_pc = CH.addItem item pc in
+                  let new_pcset = Map.insert (PC.getPhirc pc) new_pc pcset in
+                  let new_io = NS.sendMessageTo server cid $
+                               DM.makeDmMessage $ DM.Get (CH.getName pc) (IT.getName item) in
+                  (PhiWorld (new_phimap, cidset, new_pcset, npcset), pcdb,
+                   new_io : io_list, event_list, server, swdb)
+        Npc _ ->
+          undefined
+    PutItem chara_instance maybe_item_name ->
+      case chara_instance of
+        Pc pc cid ->
+          let pc_item_list = CH.getItemList pc in
+          case maybe_item_name of
+            Nothing ->
+              let new_io = NS.sendMessageTo server cid $
+                           DM.makeDmMessage $ DM.List (map IT.getName pc_item_list) in
+              (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+               new_io : io_list, event_list, server, swdb)
+            Just item_name ->
+              case findIndex (\item -> IT.getName item == item_name) pc_item_list of
+                Nothing ->
+                  let new_io = NS.sendMessageTo server cid $ DM.makeDmMessage DM.PutBad in
+                  (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+                   new_io : io_list, event_list, server, swdb)
+                Just item_ord ->
+                  let pos = CH.getPosition pc in
+                  let (new_pc, item) = fromJust $ CH.deleteItem item_ord pc in
+                  case PM.addItem pos item phimap of
+                    Nothing ->
+                      let new_io = NS.sendMessageTo server cid $ DM.makeDmMessage DM.PutBadHere in
+                      (PhiWorld (phimap, cidset, pcset, npcset), pcdb,
+                       new_io : io_list, event_list, server, swdb)
+                    Just new_phimap ->
+                      let new_pcset = Map.insert (PC.getPhirc pc) new_pc pcset in
+                      let new_io = NS.sendMessageTo server cid $
+                                   DM.makeDmMessage $ DM.Put (CH.getName pc) (IT.getName item) in
+                      (PhiWorld (new_phimap, cidset, new_pcset, npcset), pcdb,
+                       new_io : io_list, event_list, server, swdb)
+        Npc _ ->
+          undefined
     NewPc cid phirc ->
       case Map.lookup phirc pcset of
         Just _ ->

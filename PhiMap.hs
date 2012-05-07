@@ -16,6 +16,7 @@ module PhiMap
          getVisiblePositions,
          getPhiMapChip,
          getNextPosition,
+         getNextValidPosition,
          getDefaultPosition,
          makePhiMap,
          turnAbsoluteDirection,
@@ -23,14 +24,20 @@ module PhiMap
          isNormalEnterable,
          loadPosition,
          storePosition,
+         addItem,
+         deleteItem,
+         getItemList,
         ) where
 
 import Prelude hiding (Right, Left)
 import Data.List (transpose)
 import Data.String.Utils (split)
+import Data.Maybe (fromJust)
+import qualified Data.Map as Map
+import qualified Item as IT
 
 
-data Position = Position {x :: Int, y :: Int} deriving (Show, Eq)
+data Position = Position {x :: Int, y :: Int} deriving (Show, Eq, Ord)
 
 isValidPosition :: PhiMap -> Position -> Bool
 isValidPosition phimap pos =
@@ -91,7 +98,7 @@ turnAbsoluteDirection South Left = East
 turnAbsoluteDirection South Back = North
 
 
-data PhiMap = PhiMap {mapWidth :: Int, mapHeight :: Int, mapData :: [[PhiMapChip]]} deriving (Show)
+data PhiMap = PhiMap {mapWidth :: Int, mapHeight :: Int, mapData :: [[PhiMapChip]], itemDB :: Map.Map Position [IT.Item]} deriving (Show)
 data PhiMapChip = PhiMapChip {chipType :: ChipType} deriving (Show)
 data ChipType = Bars | Door | Dummy | Flower | Glass | Grass | Mist | Mwall | Pcircle | Road | Rock | Tgate | Unknown | Water | Window | Wood | Wwall deriving (Show)
 
@@ -185,6 +192,17 @@ getNextPosition _ pos adir =
         West -> Position {x = x pos - 1, y = y pos}
         South -> Position {x = x pos, y = y pos + 1}
 
+getNextValidPosition :: PhiMap -> Position -> AbsoluteDirection -> Maybe Position
+getNextValidPosition phimap pos adir =
+  let next_pos = case adir of
+        North -> Position {x = x pos, y = y pos - 1}
+        East -> Position {x = x pos + 1, y = y pos}
+        West -> Position {x = x pos - 1, y = y pos}
+        South -> Position {x = x pos, y = y pos + 1} in
+  if isValidPosition phimap next_pos then Just next_pos
+  else Nothing
+
+
 isNormalEnterable :: PhiMapChip -> Bool
 isNormalEnterable chip = case chipType chip of
   Door -> True
@@ -208,12 +226,55 @@ isNormalEnterable chip = case chipType chip of
 getDefaultPosition :: PhiMap -> Position
 getDefaultPosition _ = Position {x = 0, y = 0}
 
-makePhiMap :: PhiMap
-makePhiMap = PhiMap {mapWidth = 5, mapHeight = 5,
-                     mapData = replicate 5 $
-                               [PhiMapChip {chipType = Road},
-                                PhiMapChip {chipType = Flower},
-                                PhiMapChip {chipType = Water},
-                                PhiMapChip {chipType = Window},
-                                PhiMapChip {chipType = Wwall}]}
 
+addItem :: Position -> IT.Item -> PhiMap -> Maybe PhiMap
+addItem pos item phimap =
+  if isValidPosition phimap pos
+  then let itemdb = itemDB phimap in
+       let new_itemdb = Map.alter (\maybe_items -> case maybe_items of
+                                      Nothing -> Just [item]
+                                      Just items -> Just (item : items)
+                                  ) pos itemdb in
+       Just $ PhiMap {mapWidth = mapWidth phimap, mapHeight = mapHeight phimap,
+                      mapData = mapData phimap, itemDB = new_itemdb}
+  else Nothing
+
+deleteItem :: Position -> Int -> PhiMap -> Maybe (PhiMap, IT.Item)
+deleteItem pos ord phimap =
+  if ord < 0 || not (isValidPosition phimap pos) then Nothing
+  else case Map.lookup pos (itemDB phimap) of
+    Nothing -> Nothing
+    Just item_list ->
+      if length item_list <= ord
+         then Nothing
+         else Just (PhiMap {mapWidth =mapWidth phimap, mapHeight = mapHeight phimap,
+                            mapData = mapData phimap,
+                            itemDB = Map.insert pos (take ord item_list ++ drop (ord+1) item_list)
+                                     (itemDB phimap)},
+                    item_list !! ord)  
+
+getItemList :: PhiMap -> Position -> [IT.Item]
+getItemList phimap pos =
+  case Map.lookup pos (itemDB phimap) of
+    Nothing -> []
+    Just item_list -> item_list
+
+
+-- tentative
+makePhiMap :: PhiMap
+makePhiMap = 
+  let phimap = PhiMap {mapWidth = 5, mapHeight = 5,
+                       mapData = replicate 5 $
+                                 [PhiMapChip {chipType = Road},
+                                  PhiMapChip {chipType = Flower},
+                                  PhiMapChip {chipType = Water},
+                                  PhiMapChip {chipType = Window},
+                                  PhiMapChip {chipType = Wwall}],
+                       itemDB = Map.fromList []} in
+  foldl (\cphimap (pos, item) -> fromJust $ addItem pos item cphimap) phimap
+  [(fromJust $ loadPosition phimap "2:2",
+    IT.makeItem IT.ITWeapon "test1" (IT.Forth 1) IT.Steel IT.Sword 1 IT.Fire 0 IT.EFNone IT.SENone),
+   (fromJust $ loadPosition phimap "2:2",
+    IT.makeItem IT.ITWeapon "test2" (IT.Forth 1) IT.Steel IT.Sword 2 IT.Fire 0 IT.EFNone IT.SENone),
+   (fromJust $ loadPosition phimap "3:3",
+    IT.makeItem IT.ITWeapon "test3" (IT.Forth 1) IT.Steel IT.Sword 3 IT.Fire 0 IT.EFNone IT.SENone)]

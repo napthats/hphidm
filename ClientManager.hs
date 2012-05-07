@@ -54,6 +54,8 @@ executeClientProtocol world cid protocol =
                   PW.MessageFromDm cid $ PE.encodeProtocol PE.Close,
                   PW.LogoutPc cid]
       PD.Hit -> [PW.PcHit pc]
+      PD.Get maybe_item_name -> [PW.GetItem (PW.Pc pc cid) maybe_item_name]
+      PD.Put maybe_item_name -> [PW.PutItem (PW.Pc pc cid) maybe_item_name]
       PD.Open _ -> []
       PD.UnknownProtocol -> []
 

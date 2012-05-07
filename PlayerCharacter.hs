@@ -8,13 +8,14 @@ module PlayerCharacter
 import qualified PhiMap as PM
 import qualified Chara as CH
 import qualified Combat as CO
+import qualified Item as IT
 import CharaData
 
 
 instance CH.Chara PlayerCharacter where
-  changePosition pos pc = PlayerCharacter {pcPosition = pos, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc}
-  changeDirection dir pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = dir, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc}
-  addHp dhp injured_by pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = min (pcMhp pc) (pcHp pc + dhp), pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = Just injured_by}
+  changePosition pos pc = PlayerCharacter {pcPosition = pos, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc}
+  changeDirection dir pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = dir, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc}
+  addHp dhp injured_by pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = min (pcMhp pc) (pcHp pc + dhp), pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = Just injured_by, pcItemList = pcItemList pc}
   
   canEnterPosition phi_map pos _ = PM.isNormalEnterable (PM.getPhiMapChip phi_map pos)
   getPosition pc = pcPosition pc
@@ -36,13 +37,24 @@ instance CH.Chara PlayerCharacter where
     let next_vschara = CH.addHp (-100) (IBPc pc) vschara in
     (pc, next_vschara, CO.Dummy (CH.getName pc) (CH.getName vschara) "Knuckle" (100))
 --    (pc, next_vschara, CO.Dummy (CH.getName pc) (CH.getName vschara) "Knuckle" (CH.getHp next_vschara))
+  
+  addItem item pc =
+    PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc ++ [item]}
+
+  deleteItem ord pc =
+    if ord < 0 then Nothing
+    else let item_list = pcItemList pc in
+    if length item_list <= ord then Nothing
+    else Just (PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = take ord item_list ++ drop (ord+1) item_list}, item_list !! ord)
+  
+  getItemList pc = pcItemList pc
 
 getPhirc :: PlayerCharacter -> String
 getPhirc pc = pcPhirc pc
 
 makePlayerCharacter ::
-  PM.Position -> PM.AbsoluteDirection -> String -> String -> Int -> Int -> Int -> Int -> PlayerCharacter
-makePlayerCharacter pos dir name phirc mhp hp mmp mp = PlayerCharacter {
+  PM.Position -> PM.AbsoluteDirection -> String -> String -> Int -> Int -> Int -> Int -> [IT.Item] -> PlayerCharacter
+makePlayerCharacter pos dir name phirc mhp hp mmp mp item_list = PlayerCharacter {
   pcPosition = pos,
   pcDirection = dir,
   pcName = name,
@@ -51,7 +63,8 @@ makePlayerCharacter pos dir name phirc mhp hp mmp mp = PlayerCharacter {
   pcHp = min mhp hp,
   pcMmp = mmp,
   pcMp = min mmp mp,
-  pcInjuredBy = Nothing}
+  pcInjuredBy = Nothing,
+  pcItemList = item_list}
 
 -- tentative
 sightWidth :: Int

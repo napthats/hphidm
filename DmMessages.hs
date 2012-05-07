@@ -15,6 +15,12 @@ data DmMessageType = GoNo
                    | NoCharacter
                    | AccessAlready
                    | ChangeClientFail
+                   | Get String String
+                   | GetBad
+                   | Put String String
+                   | PutBad
+                   | PutBadHere
+                   | List [String]
                    | AttackHp String String String Int
                    | PcMessage String String
                      
@@ -28,6 +34,16 @@ makeDmMessage Tryagain = "  Try again.  "
 makeDmMessage NoCharacter = " Your character is not here. "
 makeDmMessage AccessAlready = " You accessed already. "
 makeDmMessage ChangeClientFail = " Changing client is failed. "
+makeDmMessage (Get chara_name item_name) = "DM > " ++ chara_name ++ " gets " ++ item_name ++ ". "
+makeDmMessage GetBad = "DM > Can not get such a thing. "
+makeDmMessage (Put chara_name item_name) = "DM > " ++ chara_name ++ " puts " ++ item_name ++ ". "
+makeDmMessage PutBad = "DM > You do not have such a thing. "
+makeDmMessage PutBadHere = "DM > Can not put anything here. "
+makeDmMessage (List str_list) =
+  "#list\n" ++ 
+  concat (map (\(ord, str) -> "[" ++ (if ord < 10 then " " else "") ++ show ord ++ "] " ++ str ++ "\n")
+              (zip [(1::Int)..] str_list)) ++
+  "#end-list"
 makeDmMessage (PcMessage name msg) = name ++ " > " ++ msg
 makeDmMessage (AttackHp name vsname method value) =
   "DM > " ++ name ++ " attacked to " ++ vsname ++ " by " ++ method

@@ -13,6 +13,8 @@ data ClientProtocol = Open String
                     | Turn (Maybe PM.Direction)
                     | Exit
                     | Hit
+                    | Get (Maybe String)
+                    | Put (Maybe String)
                     | RawMessage String
                     | UnknownProtocol
                     deriving (Show)
@@ -32,6 +34,10 @@ decodeClientMessage msg =
       ["turn"] -> Turn Nothing
       ["turn", dir] -> Turn $ stringToDirection dir
       ["hit"] -> Hit
+      ["get"] -> Get Nothing
+      ["get", item_name] -> Get (Just item_name)
+      ["put"] -> Put Nothing
+      ["put", item_name] -> Put (Just item_name)
       _ -> RawMessage raw_message
 
 stringToDirection :: String -> Maybe PM.Direction

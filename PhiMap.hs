@@ -98,25 +98,25 @@ turnAbsoluteDirection South Left = East
 turnAbsoluteDirection South Back = North
 
 
-data PhiMap = PhiMap {mapWidth :: Int, mapHeight :: Int, mapData :: [[PhiMapChip]], itemDB :: Map.Map Position [IT.Item]} deriving (Show)
+data PhiMap = PhiMap {mapWidth :: Int, mapHeight :: Int, mapData :: [[(Position, PhiMapChip)]], itemDB :: Map.Map Position [IT.Item]} deriving (Show)
 data PhiMapChip = PhiMapChip {chipType :: ChipType} deriving (Show)
 data ChipType = Bars | Door | Dummy | Flower | Glass | Grass | Mist | Mwall | Pcircle | Road | Rock | Tgate | Unknown | Water | Window | Wood | Wwall deriving (Show)
 
-outsidePhiMapChip :: PhiMapChip
-outsidePhiMapChip = PhiMapChip {chipType = Unknown}
+outsidePhiMapChip :: (Position, PhiMapChip)
+outsidePhiMapChip = (Position {x = -1, y = -1}, PhiMapChip {chipType = Unknown}) --tentative
 
 getPhiMapChip :: PhiMap -> Position -> PhiMapChip
 getPhiMapChip phimap pos = 
   if isValidPosition phimap pos
-  then (mapData phimap) !! (y pos) !! (x pos)
-  else outsidePhiMapChip
+  then snd $ (mapData phimap) !! (y pos) !! (x pos)
+  else snd outsidePhiMapChip
 
 getPositionRegion :: PhiMap -> Position -> Int -> Int -> [[Position]]
 getPositionRegion _ pos width height =
   take height $ iterate (map (\p -> Position {x = x p, y = y p + 1})) $
   take width $ iterate (\p -> Position {x = x p + 1, y = y p}) pos
 
-getPhiMapChipRegion :: PhiMap -> Position -> Int -> Int -> [[PhiMapChip]]
+getPhiMapChipRegion :: PhiMap -> Position -> Int -> Int -> [[(Position, PhiMapChip)]]
 getPhiMapChipRegion phimap pos width height =
   let map_data = mapData phimap in
   map ((padTake width outsidePhiMapChip) . (padDrop (x pos) outsidePhiMapChip))
@@ -155,14 +155,16 @@ getRegionWith get_region_func phimap pos adir width height =
 
 getVisiblePositions ::
   SightType -> PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> [[Position]]
-getVisiblePositions All = getRegionWith getPositionRegion
+getVisiblePositions All phimap pos adir width height =
+  getRegionWith getPositionRegion phimap pos adir width height
 
 getMapView :: SightType -> PhiMap -> Position -> AbsoluteDirection -> Int -> Int -> PhiMapView
 getMapView All phimap pos adir width height =
-  map (map mapChipToViewChip) $ getRegionWith getPhiMapChipRegion phimap pos adir width height
+  map (map (\(each_pos, map_chip) -> mapChipToViewChip phimap each_pos map_chip)) $
+      getRegionWith getPhiMapChipRegion phimap pos adir width height
 
-mapChipToViewChip :: PhiMapChip -> ViewChip
-mapChipToViewChip map_chip =
+mapChipToViewChip :: PhiMap -> Position -> PhiMapChip -> ViewChip
+mapChipToViewChip phimap pos map_chip =
   let view_type = case chipType map_chip of
         Bars -> VBars
         Door -> VDoor
@@ -180,8 +182,10 @@ mapChipToViewChip map_chip =
         Water -> VWater
         Window -> VWindow
         Wood -> VWood
-        Wwall -> VWwall
-  in ViewChip {viewType = view_type, viewOptions = []}
+        Wwall -> VWwall in
+  -- tentative
+  let view_option_list = if length (getItemList phimap pos) == 0 then [] else [FloorItem Other] in
+  ViewChip {viewType = view_type, viewOptions = view_option_list}
   
 -- can return invalid Position (for example, outside of tha map)
 getNextPosition :: PhiMap -> Position -> AbsoluteDirection -> Position
@@ -264,12 +268,31 @@ getItemList phimap pos =
 makePhiMap :: PhiMap
 makePhiMap = 
   let phimap = PhiMap {mapWidth = 5, mapHeight = 5,
-                       mapData = replicate 5 $
-                                 [PhiMapChip {chipType = Road},
-                                  PhiMapChip {chipType = Flower},
-                                  PhiMapChip {chipType = Water},
-                                  PhiMapChip {chipType = Window},
-                                  PhiMapChip {chipType = Wwall}],
+                       mapData = [[(Position {x = 0, y = 0}, PhiMapChip {chipType = Dummy}),
+                                  (Position {x = 1, y = 0}, PhiMapChip {chipType = Dummy}),
+                                  (Position {x = 2, y = 0}, PhiMapChip {chipType = Water}),
+                                  (Position {x = 3, y = 0}, PhiMapChip {chipType = Window}),
+                                  (Position {x = 4, y = 0}, PhiMapChip {chipType = Wwall})],
+                                 [(Position {x = 0, y = 1}, PhiMapChip {chipType = Road}),
+                                  (Position {x = 1, y = 1}, PhiMapChip {chipType = Flower}),
+                                  (Position {x = 2, y = 1}, PhiMapChip {chipType = Water}),
+                                  (Position {x = 3, y = 1}, PhiMapChip {chipType = Window}),
+                                  (Position {x = 4, y = 1}, PhiMapChip {chipType = Wwall})],
+                                 [(Position {x = 0, y = 2}, PhiMapChip {chipType = Road}),
+                                  (Position {x = 1, y = 2}, PhiMapChip {chipType = Flower}),
+                                  (Position {x = 2, y = 2}, PhiMapChip {chipType = Water}),
+                                  (Position {x = 3, y = 2}, PhiMapChip {chipType = Window}),
+                                  (Position {x = 4, y = 2}, PhiMapChip {chipType = Wwall})],
+                                 [(Position {x = 0, y = 3}, PhiMapChip {chipType = Road}),
+                                  (Position {x = 1, y = 3}, PhiMapChip {chipType = Flower}),
+                                  (Position {x = 2, y = 3}, PhiMapChip {chipType = Water}),
+                                  (Position {x = 3, y = 3}, PhiMapChip {chipType = Window}),
+                                  (Position {x = 4, y = 3}, PhiMapChip {chipType = Wwall})],
+                                 [(Position {x = 0, y = 4}, PhiMapChip {chipType = Road}),
+                                  (Position {x = 1, y = 4}, PhiMapChip {chipType = Flower}),
+                                  (Position {x = 2, y = 4}, PhiMapChip {chipType = Water}),
+                                  (Position {x = 3, y = 4}, PhiMapChip {chipType = Window}),
+                                  (Position {x = 4, y = 4}, PhiMapChip {chipType = Wwall})]],
                        itemDB = Map.fromList []} in
   foldl (\cphimap (pos, item) -> fromJust $ addItem pos item cphimap) phimap
   [(fromJust $ loadPosition phimap "2:2",

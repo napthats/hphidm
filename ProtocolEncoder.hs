@@ -73,8 +73,10 @@ viewChipToString chip =
     PM.VWwall -> "#"
     PM.VDoor_Lock -> "{"
     PM.VPcircle_Lock -> "%"
-  ++ [chr 128]
-
+  -- tentative
+  ++ if length (PM.viewOptions chip) == 0 
+        then [chr 128]
+        else [chr 144]
 
 -- tentative
 -- x and y must be lower than 10

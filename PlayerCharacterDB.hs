@@ -25,7 +25,7 @@ loadPc :: PlayerCharacterDB -> Phirc -> Maybe PC.PlayerCharacter
 loadPc (PcDB pcdb) phirc = case lookup phirc pcdb of
   Nothing -> Nothing
   Just (pos, dir, name, mhp, hp, mmp, mp, item_list) ->
-    Just $ PC.makePlayerCharacter pos dir name phirc mhp hp mmp mp item_list
+    Just $ PC.makePlayerCharacter pos dir name phirc mhp hp mmp mp item_list PC.Command
 
 savePc :: PlayerCharacterDB -> Phirc -> PC.PlayerCharacter -> PlayerCharacterDB
 savePc (PcDB pcdb) phirc pc =

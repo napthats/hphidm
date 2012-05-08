@@ -4,6 +4,8 @@ module CharaData
          NonPlayerCharacter(..),
          InjuredBy(..),
          NpcId(..),
+         PcState(..),
+         SLAction(..),
          nextNpcId,
          newNpcId,
        ) where
@@ -45,8 +47,14 @@ data PlayerCharacter = PlayerCharacter {
   pcMmp :: Int,
   pcMp :: Int,
   pcInjuredBy :: Maybe InjuredBy,
-  pcItemList :: [IT.Item]} deriving (Show)
+  pcItemList :: [IT.Item],
+  pcState :: PcState} deriving (Show)
 
 data InjuredBy = IBPc PlayerCharacter 
                | IBNpc NonPlayerCharacter
                deriving (Show)
+
+data PcState = Command | SelectList SLAction deriving (Show)
+
+data SLAction = SLPut | SLGet deriving (Show)
+

@@ -3,6 +3,10 @@ module PlayerCharacter
          PlayerCharacter(),
          makePlayerCharacter,
          getPhirc,
+         getState,
+         setState,
+         PcState(..),
+         SLAction(..),
         ) where
 
 import qualified PhiMap as PM
@@ -12,10 +16,16 @@ import qualified Item as IT
 import CharaData
 
 
+getState :: PlayerCharacter -> PcState
+getState pc = pcState pc
+
+setState :: PcState -> PlayerCharacter -> Maybe PlayerCharacter
+setState state pc = Just $ PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc, pcState = state}
+
 instance CH.Chara PlayerCharacter where
-  changePosition pos pc = PlayerCharacter {pcPosition = pos, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc}
-  changeDirection dir pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = dir, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc}
-  addHp dhp injured_by pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = min (pcMhp pc) (pcHp pc + dhp), pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = Just injured_by, pcItemList = pcItemList pc}
+  changePosition pos pc = PlayerCharacter {pcPosition = pos, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc, pcState = pcState pc}
+  changeDirection dir pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = dir, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc, pcState = pcState pc}
+  addHp dhp injured_by pc = PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = min (pcMhp pc) (pcHp pc + dhp), pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = Just injured_by, pcItemList = pcItemList pc, pcState = pcState pc}
   
   canEnterPosition phi_map pos _ = PM.isNormalEnterable (PM.getPhiMapChip phi_map pos)
   getPosition pc = pcPosition pc
@@ -39,13 +49,13 @@ instance CH.Chara PlayerCharacter where
 --    (pc, next_vschara, CO.Dummy (CH.getName pc) (CH.getName vschara) "Knuckle" (CH.getHp next_vschara))
   
   addItem item pc =
-    PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc ++ [item]}
+    PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = pcItemList pc ++ [item], pcState = pcState pc}
 
   deleteItem ord pc =
     if ord < 0 then Nothing
     else let item_list = pcItemList pc in
     if length item_list <= ord then Nothing
-    else Just (PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = take ord item_list ++ drop (ord+1) item_list}, item_list !! ord)
+    else Just (PlayerCharacter {pcPosition = pcPosition pc, pcDirection = pcDirection pc, pcName = pcName pc, pcPhirc = pcPhirc pc, pcMhp = pcMhp pc, pcHp = pcHp pc, pcMmp = pcMmp pc, pcMp = pcMp pc, pcInjuredBy = pcInjuredBy pc, pcItemList = take ord item_list ++ drop (ord+1) item_list, pcState = pcState pc}, item_list !! ord)
   
   getItemList pc = pcItemList pc
 
@@ -53,8 +63,8 @@ getPhirc :: PlayerCharacter -> String
 getPhirc pc = pcPhirc pc
 
 makePlayerCharacter ::
-  PM.Position -> PM.AbsoluteDirection -> String -> String -> Int -> Int -> Int -> Int -> [IT.Item] -> PlayerCharacter
-makePlayerCharacter pos dir name phirc mhp hp mmp mp item_list = PlayerCharacter {
+  PM.Position -> PM.AbsoluteDirection -> String -> String -> Int -> Int -> Int -> Int -> [IT.Item] -> PcState -> PlayerCharacter
+makePlayerCharacter pos dir name phirc mhp hp mmp mp item_list state = PlayerCharacter {
   pcPosition = pos,
   pcDirection = dir,
   pcName = name,
@@ -64,7 +74,8 @@ makePlayerCharacter pos dir name phirc mhp hp mmp mp item_list = PlayerCharacter
   pcMmp = mmp,
   pcMp = min mmp mp,
   pcInjuredBy = Nothing,
-  pcItemList = item_list}
+  pcItemList = item_list,
+  pcState = state}
 
 -- tentative
 sightWidth :: Int

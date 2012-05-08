@@ -24,7 +24,7 @@ data ActionResult =
   | LogoutPc NS.ClientID
   | PcHit PC.PlayerCharacter
   | ForceDisconnect NS.ClientID
-data PcStatusChangeType = PSCDirection | PSCPosition deriving (Show)
+data PcStatusChangeType = PSCDirection | PSCPosition | PSCState deriving (Show)
 data NpcStatusChangeType = NSCDirection | NSCPosition deriving (Show)
 
 data CharaInstance = Pc PC.PlayerCharacter NS.ClientID | Npc NPC.NonPlayerCharacter deriving (Show)

@@ -1,44 +1,48 @@
 module ProtocolDecoder
        (
          ClientProtocol(..),
+         SProtocolType(..),
+         RProtocolType(..),
          decodeClientMessage,
        ) where
 
-import Data.String.Utils (split)
+import Data.String.Utils (split, join)
 import qualified PhiMap as PM
 
 
-data ClientProtocol = Open String
-                    | Go PM.Direction
-                    | Turn (Maybe PM.Direction)
-                    | Exit
-                    | Hit
-                    | Get (Maybe String)
-                    | Put (Maybe String)
-                    | RawMessage String
-                    | UnknownProtocol
-                    deriving (Show)
+data ClientProtocol = SharpProtocol SProtocolType | RawProtocol RProtocolType deriving (Show)
+  
+data SProtocolType = Open String | UnknownProtocol deriving (Show)
+
+data RProtocolType = Go PM.Direction
+                   | Turn (Maybe PM.Direction)
+                   | Exit
+                   | Hit
+                   | Get (Maybe String)
+                   | Put (Maybe String)
+                   | RawMessage String
+                   deriving (Show)
 
 decodeClientMessage :: String -> ClientProtocol
 decodeClientMessage msg =
   case msg of
     '#' : msg_rest -> case split " " msg_rest of
-      ["open", phirc] -> Open phirc
-      _ -> UnknownProtocol
+      ["open", phirc] -> SharpProtocol $ Open phirc
+      _ -> SharpProtocol UnknownProtocol
     raw_message -> case split " " raw_message of
-      ["exit"] -> Exit
-      ["go"] -> Go $ PM.RelativeDirection PM.Forth
+      ["exit"] -> RawProtocol Exit
+      ["go"] -> RawProtocol $ Go $ PM.RelativeDirection PM.Forth
       ["go", dir] -> case stringToDirection dir of
-                          Nothing -> Go $ PM.RelativeDirection PM.Forth
-                          Just d -> Go d
-      ["turn"] -> Turn Nothing
-      ["turn", dir] -> Turn $ stringToDirection dir
-      ["hit"] -> Hit
-      ["get"] -> Get Nothing
-      ["get", item_name] -> Get (Just item_name)
-      ["put"] -> Put Nothing
-      ["put", item_name] -> Put (Just item_name)
-      _ -> RawMessage raw_message
+                          Nothing -> RawProtocol $ Go $ PM.RelativeDirection PM.Forth
+                          Just d -> RawProtocol $ Go d
+      ["turn"] -> RawProtocol $ Turn Nothing
+      ["turn", dir] -> RawProtocol $ Turn $ stringToDirection dir
+      ["hit"] -> RawProtocol Hit
+      ["get"] -> RawProtocol $ Get Nothing
+      "get" : item_name_list -> RawProtocol $ Get $ Just $ join " " item_name_list
+      ["put"] -> RawProtocol $ Put Nothing
+      "put" : item_name_list -> RawProtocol $ Put $ Just $ join " " item_name_list
+      _ -> RawProtocol $ RawMessage raw_message
 
 stringToDirection :: String -> Maybe PM.Direction
 stringToDirection st = case st of

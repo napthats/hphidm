@@ -56,5 +56,4 @@ data InjuredBy = IBPc PlayerCharacter
 
 data PcState = Command | SelectList SLAction deriving (Show)
 
-data SLAction = SLPut | SLGet deriving (Show)
-
+data SLAction = SLPut | SLGet | SLCast deriving (Show)
